@@ -1,0 +1,173 @@
+.contenedor {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+  font-family: Arial, sans-serif;
+}
+
+h1,
+h2 {
+  margin-bottom: 12px;
+}
+
+.mensaje {
+  padding: 12px 14px;
+  background: #f2f2f2;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.panel {
+  margin-bottom: 24px;
+  padding: 18px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.acciones-superiores {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.grupo-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.grupo-campo-inline {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.grupo-campo-inline > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.grupo-botones {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+input {
+  min-width: 120px;
+  padding: 8px 10px;
+  border: 1px solid #cfcfcf;
+  border-radius: 8px;
+}
+
+button {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #1f6feb;
+  color: #fff;
+  font-weight: 600;
+}
+
+button:hover {
+  opacity: 0.92;
+}
+
+.boton-secundario {
+  background: #6b7280;
+}
+
+.boton-terciario {
+  background: #7c3aed;
+}
+
+.tablero {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fila {
+  display: flex;
+  gap: 6px;
+}
+
+.casilla {
+  width: 52px;
+  height: 52px;
+  border: 1px solid #bbb;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #d9d9d9;
+  color: #111;
+  font-weight: 700;
+  padding: 0;
+  font-size: 12px;
+}
+
+.casilla.abierta {
+  background: #f7f7f7;
+  color: #111;
+}
+
+.casilla.mina {
+  background: #ffb3b3;
+  color: #7f1d1d;
+}
+
+.casilla.seleccionada {
+  outline: 3px solid #f59e0b;
+}
+
+.casilla.recomendada {
+  outline: 3px solid #10b981;
+}
+
+.casilla.probabilidad {
+  background: #e0ecff;
+  color: #1d4ed8;
+}
+
+.jugada-ia {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+}
+
+.bloque-probabilidades {
+  padding: 14px;
+  border-radius: 10px;
+  background: #111827;
+  color: #e5e7eb;
+  overflow-x: auto;
+  font-size: 13px;
+}
+
+.historial {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.evento {
+  padding: 12px;
+  border-radius: 8px;
+  background: #f6f6f6;
+}
+
+.evento .tipo {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #374151;
+}

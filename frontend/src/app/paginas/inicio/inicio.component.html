@@ -1,0 +1,153 @@
+<div class="contenedor">
+  <h1>Buscaminas IA</h1>
+
+  <p class="mensaje">{{ mensaje() }}</p>
+
+  <section class="panel acciones-superiores">
+    <div class="grupo-campo">
+      <label for="totalMinas">Total de minas</label>
+      <input id="totalMinas" type="number" [(ngModel)]="totalMinas" min="1" max="99" />
+    </div>
+
+    <div class="grupo-botones">
+      <button (click)="crearTablero()">Crear tablero</button>
+      <button class="boton-secundario" (click)="reiniciarTablero()">Reiniciar tablero</button>
+      <button class="boton-terciario" (click)="cargarProbabilidades()">Ver probabilidades</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Tablero</h2>
+
+    @if (tablero()) {
+      <div class="tablero">
+        @for (fila of tablero()?.matriz; track $index) {
+          <div class="fila">
+            @for (casilla of fila; track casilla.fila + '-' + casilla.columna) {
+              <button
+                type="button"
+                class="casilla"
+                [class.abierta]="casilla.abierta"
+                [class.mina]="casilla.marcadaComoMina"
+                [class.seleccionada]="esCasillaSeleccionada(casilla)"
+                [class.recomendada]="esCasillaRecomendadaPorIa(casilla)"
+                [class.probabilidad]="esCasillaConProbabilidad(casilla)"
+                (click)="seleccionarCasillaManual(casilla)"
+              >
+                {{ obtenerTextoCasilla(casilla) }}
+              </button>
+            }
+          </div>
+        }
+      </div>
+    } @else {
+      <p>Crea un tablero para comenzar.</p>
+    }
+  </section>
+
+  <section class="panel">
+    <h2>Registrar jugada manual</h2>
+
+    @if (casillaSeleccionadaManual()) {
+      <p>
+        Casilla seleccionada:
+        <strong>[{{ casillaSeleccionadaManual()?.fila }}, {{ casillaSeleccionadaManual()?.columna }}]</strong>
+      </p>
+    } @else {
+      <p>Haz clic en una casilla cerrada del tablero.</p>
+    }
+
+    <div class="grupo-campo">
+      <label for="minasAlrededorManual">Minas alrededor</label>
+      <input
+        id="minasAlrededorManual"
+        type="number"
+        [(ngModel)]="minasAlrededorManual"
+        min="0"
+        max="8"
+      />
+    </div>
+
+    <button (click)="registrarPrimeraJugada()">Registrar jugada</button>
+  </section>
+
+  <section class="panel">
+    <h2>IA</h2>
+    <button (click)="pedirJugadaIa()">Pedir siguiente jugada</button>
+
+    @if (jugadaIaActual()) {
+      <div class="jugada-ia">
+        <p><strong>Fila:</strong> {{ jugadaIaActual()?.fila }}</p>
+        <p><strong>Columna:</strong> {{ jugadaIaActual()?.columna }}</p>
+        <p><strong>Motivo:</strong> {{ jugadaIaActual()?.motivo }}</p>
+        <p><strong>Probabilidad:</strong> {{ jugadaIaActual()?.probabilidadMina }}%</p>
+        <p><strong>Recomendación:</strong> {{ jugadaIaActual()?.recomendacion }}</p>
+      </div>
+    }
+  </section>
+
+  <section class="panel">
+    <h2>Registrar resultado de la IA</h2>
+
+    <div class="grupo-campo grupo-campo-inline">
+      <div>
+        <label for="filaResultadoIa">Fila</label>
+        <input id="filaResultadoIa" type="number" [(ngModel)]="filaResultadoIa" min="0" max="9" />
+      </div>
+
+      <div>
+        <label for="columnaResultadoIa">Columna</label>
+        <input id="columnaResultadoIa" type="number" [(ngModel)]="columnaResultadoIa" min="0" max="9" />
+      </div>
+
+      <div>
+        <label for="minasAlrededorResultadoIa">Minas alrededor</label>
+        <input
+          id="minasAlrededorResultadoIa"
+          type="number"
+          [(ngModel)]="minasAlrededorResultadoIa"
+          min="0"
+          max="8"
+        />
+      </div>
+    </div>
+
+    <button (click)="registrarResultadoIa()">Registrar resultado</button>
+  </section>
+
+  <section class="panel">
+    <h2>Vista de probabilidades</h2>
+
+    @if (tableroProbabilidadesTexto()) {
+      <pre class="bloque-probabilidades">{{ tableroProbabilidadesTexto() }}</pre>
+    } @else {
+      <p>Todavía no hay probabilidades cargadas.</p>
+    }
+  </section>
+
+  <section class="panel">
+    <h2>Historial</h2>
+
+    @if (historial().length > 0) {
+      <div class="historial">
+        @for (item of historial(); track item.turno) {
+          <div class="evento">
+            <strong>Turno {{ item.turno }}</strong>
+            <span class="tipo">{{ item.tipo }}</span>
+            <p>{{ item.detalle }}</p>
+
+            @if (item.fila !== null && item.columna !== null) {
+              <small>Casilla: [{{ item.fila }}, {{ item.columna }}]</small>
+            }
+
+            @if (item.minasAlrededor !== null) {
+              <small> Minas alrededor: {{ item.minasAlrededor }}</small>
+            }
+          </div>
+        }
+      </div>
+    } @else {
+      <p>No hay historial todavía.</p>
+    }
+  </section>
+</div>
