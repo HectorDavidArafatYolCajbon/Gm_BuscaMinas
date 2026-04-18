@@ -2,42 +2,12 @@ import { Casilla } from '../interfaces/casilla.interface';
 import { Jugada } from '../interfaces/jugada.interface';
 import { Tablero } from '../interfaces/tablero.interface';
 
-/**
- * IABuscaminasServicio
- *
- * Servicio de inteligencia artificial para el juego Buscaminas 10x10.
- *
- * Reglas del juego:
- *  - La IA escoge una casilla para levantar.
- *  - El usuario responde cuántas minas hay alrededor (0-8).
- *  - Si el usuario responde mina, el juego se pierde inmediatamente.
- *  - No existen minas predefinidas: solo hay mina si el usuario lo dice.
- *  - La IA no aprende entre partidas: cada juego empieza desde cero.
- *
- * Estrategia en tres capas:
- *  Capa 1 — Lógica directa:      deduce casillas seguras o minas con certeza.
- *  Capa 2 — Comparación de grupos: deduce nuevas minas comparando conjuntos de vecinos.
- *  Capa 3 — Estadística:          elige la casilla de menor riesgo cuando no hay certeza.
- *
- * La lógica de cada casilla está escrita de forma explícita casilla por casilla
- * ya que el tablero siempre es 10x10 y los vecinos de cada posición son fijos.
- */
 export class IABuscaminasServicio {
-  /**
-   * Última casilla recomendada. Se usa para evitar recomendar la misma dos veces seguidas
-   * cuando hay otras opciones disponibles.
-   */
+
+   // guarda la ultima jugada para no repetirla si hay mas opciones
   private ultimaJugadaRecomendada: { fila: number; columna: number } | null = null;
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // MÉTODO PÚBLICO PRINCIPAL
-  // ─────────────────────────────────────────────────────────────────────────
-
-  /**
-   * Calcula y devuelve la siguiente jugada recomendada.
-   * Aplica las tres capas de estrategia en orden.
-   * Se llama tanto al inicio del juego como después de cada resultado informado.
-   */
+   // saca la siguiente jugada usando las capas de estrategia
   public obtenerSiguienteJugada(tablero: Tablero): Jugada {
     const casillasDisponibles = this.obtenerCasillasDisponibles(tablero);
 
@@ -48,14 +18,14 @@ export class IABuscaminasServicio {
     this.limpiarRecomendaciones(tablero);
     this.limpiarProbabilidades(tablero);
 
-    // Capa 1: lógica directa — busca casillas seguras con certeza
+    // primero intenta por logica directa
     const jugadaLogica = this.buscarJugadaSeguraPorLogica(tablero);
     if (jugadaLogica) {
       this.ultimaJugadaRecomendada = { fila: jugadaLogica.fila, columna: jugadaLogica.columna };
       return jugadaLogica;
     }
 
-    // Capa 2: comparación de grupos — deduce nuevas minas y vuelve a intentar lógica directa
+    // si no sale nada compara grupos y vuelve a intentar
     this.aplicarComparacionDeGrupos(tablero);
     const jugadaTrasComparacion = this.buscarJugadaSeguraPorLogica(tablero);
     if (jugadaTrasComparacion) {
@@ -63,7 +33,7 @@ export class IABuscaminasServicio {
       return jugadaTrasComparacion;
     }
 
-    // Capa 3: estadística — menor riesgo entre casillas disponibles, elegida al azar si hay empate
+    // al final se va por la opcion con menor riesgo
     const casillasActualizadas = this.obtenerCasillasDisponibles(tablero);
     if (casillasActualizadas.length === 0) {
       throw new Error('Ya no hay casillas disponibles para recomendar');
@@ -73,19 +43,12 @@ export class IABuscaminasServicio {
     return jugadaEstadistica;
   }
 
-  /**
-   * Reinicia el estado interno de la IA para una nueva partida.
-   * La IA no guarda memoria entre partidas.
-   */
   public reiniciar(): void {
     this.ultimaJugadaRecomendada = null;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // MÉTODOS AUXILIARES
-  // ─────────────────────────────────────────────────────────────────────────
 
-  /** Devuelve todas las casillas que la IA puede recomendar: cerradas y no marcadas como mina. */
+  // Devuelve todas las casillas que la IA puede recomendar: cerradas y no marcadas como mina
   private obtenerCasillasDisponibles(tablero: Tablero): Casilla[] {
     const disponibles: Casilla[] = [];
     for (let fila = 0; fila < 10; fila++) {
@@ -97,7 +60,7 @@ export class IABuscaminasServicio {
     return disponibles;
   }
 
-  /** Reinicia el campo recomendacion antes de cada análisis. */
+  //Reinicia el campo recomendacion antes de cada analisis
   private limpiarRecomendaciones(tablero: Tablero): void {
     for (let fila = 0; fila < 10; fila++) {
       for (let columna = 0; columna < 10; columna++) {
@@ -106,7 +69,7 @@ export class IABuscaminasServicio {
     }
   }
 
-  /** Reinicia el campo probabilidadMina antes de cada análisis. */
+  // limpia probabilidades viejas para no mezclar analisis
   private limpiarProbabilidades(tablero: Tablero): void {
     for (let fila = 0; fila < 10; fila++) {
       for (let columna = 0; columna < 10; columna++) {
@@ -115,7 +78,7 @@ export class IABuscaminasServicio {
     }
   }
 
-  /** Aplica marcas de minas deducidas lógicamente. */
+  // marca minas deducidas para que ya no se tomen como opcion
   private aplicarMarcasMinas(minas: Casilla[]): void {
     for (const mina of minas) {
       mina.marcadaComoMina = true;
@@ -124,7 +87,7 @@ export class IABuscaminasServicio {
     }
   }
 
-  /** Entre varias casillas seguras, elige una que no sea la última recomendada. */
+  // Entre varias casillas seguras, elige una que no sea la ultima recomendada
   private elegirMejorCasillaSegura(casillasSeguras: Casilla[]): Casilla {
     for (const casilla of casillasSeguras) {
       if (!this.esLaMismaUltimaJugada(casilla)) return casilla;
@@ -132,7 +95,7 @@ export class IABuscaminasServicio {
     return casillasSeguras[0];
   }
 
-  /** True si la casilla es la misma que la última recomendada. */
+  //True si la casilla es la misma que la ultima recomendada.
   private esLaMismaUltimaJugada(casilla: Casilla): boolean {
     if (!this.ultimaJugadaRecomendada) return false;
     return casilla.fila === this.ultimaJugadaRecomendada.fila && casilla.columna === this.ultimaJugadaRecomendada.columna;
@@ -146,22 +109,17 @@ export class IABuscaminasServicio {
     return origen.filter((o) => !referencia.some((r) => r.fila === o.fila && r.columna === o.columna));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // CAPA 1 — LÓGICA DIRECTA (explícita por cada casilla del tablero 10x10)
-  // ─────────────────────────────────────────────────────────────────────────
+ 
+  // CAPA 1 
 
-  /**
-   * Analiza las 100 casillas de forma explícita.
-   * Las minas deducidas se acumulan y se aplican al FINAL del pase completo
-   * para que el marcado de una casilla no afecte el análisis de las siguientes.
-   *
-   * Regla A — si minasFaltantes === 0 y hay vecinos cerrados → son seguros → devuelve uno.
-   * Regla B — si vecinos cerrados === minasFaltantes → todos son minas → se acumulan.
-   */
+
+   //Regla A si minasFaltantes === 0 y hay vecinos cerrados son seguros devuelve uno
+   //Regla B si vecinos cerrados === minasFaltantes todos son minas se acumulan.
+
   private buscarJugadaSeguraPorLogica(tablero: Tablero): Jugada | null {
     const minasParaMarcar: Casilla[] = [];
 
-    // ── Casilla [0,0] — esquina, 3 vecinos: [0,1], [1,0], [1,1]
+    // Casilla 0,0 esquina, 3 vecinos: 0,1, 1,0, 1,1
     {
       const casilla = tablero.matriz[0][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -184,7 +142,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,1] — borde, 5 vecinos: [0,0], [0,2], [1,0], [1,1], [1,2]
+    // Casilla 0,1 borde, 5 vecinos: 0,0, 0,2, 1,0, 1,1, 1,2
     {
       const casilla = tablero.matriz[0][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -207,7 +165,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,2] — borde, 5 vecinos: [0,1], [0,3], [1,1], [1,2], [1,3]
+    // Casilla 0,2 borde, 5 vecinos: 0,1, 0,3, 1,1, 1,2, 1,3
     {
       const casilla = tablero.matriz[0][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -230,7 +188,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,3] — borde, 5 vecinos: [0,2], [0,4], [1,2], [1,3], [1,4]
+    // Casilla 0,3 borde, 5 vecinos: 0,2 ,0,4 ,1,2 ,1,3 ,1,4
     {
       const casilla = tablero.matriz[0][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -253,7 +211,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,4] — borde, 5 vecinos: [0,3], [0,5], [1,3], [1,4], [1,5]
+    // Casilla 0,4 borde, 5 vecinos: 0,3 ,0,5 ,1,3 ,1,4 ,1,5
     {
       const casilla = tablero.matriz[0][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -276,7 +234,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,5] — borde, 5 vecinos: [0,4], [0,6], [1,4], [1,5], [1,6]
+    // Casilla 0,5 borde, 5 vecinos: 0,4 ,0,6 ,1,4 ,1,5 ,1,6
     {
       const casilla = tablero.matriz[0][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -299,7 +257,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,6] — borde, 5 vecinos: [0,5], [0,7], [1,5], [1,6], [1,7]
+    // Casilla 0,6 borde, 5 vecinos: 0,5 ,0,7 ,1,5 ,1,6 ,1,7
     {
       const casilla = tablero.matriz[0][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -322,7 +280,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,7] — borde, 5 vecinos: [0,6], [0,8], [1,6], [1,7], [1,8]
+    // Casilla 0,7 borde, 5 vecinos: 0,6 ,0,8 ,1,6 ,1,7 ,1,8
     {
       const casilla = tablero.matriz[0][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -345,7 +303,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,8] — borde, 5 vecinos: [0,7], [0,9], [1,7], [1,8], [1,9]
+    // Casilla 0,8 borde, 5 vecinos: 0,7 ,0,9 ,1,7 ,1,8 ,1,9
     {
       const casilla = tablero.matriz[0][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -368,7 +326,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,9] — esquina, 3 vecinos: [0,8], [1,8], [1,9]
+    // Casilla 0,9 esquina, 3 vecinos: 0,8 ,1,8 ,1,9
     {
       const casilla = tablero.matriz[0][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -391,7 +349,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,0] — borde, 5 vecinos: [0,0], [0,1], [1,1], [2,0], [2,1]
+    // Casilla 1,0 borde, 5 vecinos: 0,0 ,0,1 ,1,1 ,2,0 ,2,1
     {
       const casilla = tablero.matriz[1][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -414,7 +372,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,1] — interior, 8 vecinos: [0,0], [0,1], [0,2], [1,0], [1,2], [2,0], [2,1], [2,2]
+    // Casilla 1,1 interior, 8 vecinos: 0,0 ,0,1 ,0,2 ,1,0 ,1,2 ,2,0 ,2,1 ,2,2
     {
       const casilla = tablero.matriz[1][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -437,7 +395,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,2] — interior, 8 vecinos: [0,1], [0,2], [0,3], [1,1], [1,3], [2,1], [2,2], [2,3]
+    // Casilla 1,2 interior, 8 vecinos: 0,1 ,0,2 ,0,3 ,1,1 ,1,3 ,2,1 ,2,2 ,2,3
     {
       const casilla = tablero.matriz[1][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -460,7 +418,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,3] — interior, 8 vecinos: [0,2], [0,3], [0,4], [1,2], [1,4], [2,2], [2,3], [2,4]
+    // Casilla 1,3 interior, 8 vecinos: 0,2 ,0,3 ,0,4 ,1,2 ,1,4 ,2,2 ,2,3 ,2,4
     {
       const casilla = tablero.matriz[1][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -483,7 +441,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,4] — interior, 8 vecinos: [0,3], [0,4], [0,5], [1,3], [1,5], [2,3], [2,4], [2,5]
+    // Casilla 1,4 interior, 8 vecinos: 0,3 ,0,4 ,0,5 ,1,3 ,1,5 ,2,3 ,2,4 ,2,5
     {
       const casilla = tablero.matriz[1][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -506,7 +464,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,5] — interior, 8 vecinos: [0,4], [0,5], [0,6], [1,4], [1,6], [2,4], [2,5], [2,6]
+    // Casilla 1,5 interior, 8 vecinos: 0,4 ,0,5 ,0,6 ,1,4 ,1,6 ,2,4 ,2,5 ,2,6
     {
       const casilla = tablero.matriz[1][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -529,7 +487,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,6] — interior, 8 vecinos: [0,5], [0,6], [0,7], [1,5], [1,7], [2,5], [2,6], [2,7]
+    // Casilla 1,6 interior, 8 vecinos: 0,5 ,0,6 ,0,7 ,1,5 ,1,7 ,2,5 ,2,6 ,2,7
     {
       const casilla = tablero.matriz[1][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -552,7 +510,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,7] — interior, 8 vecinos: [0,6], [0,7], [0,8], [1,6], [1,8], [2,6], [2,7], [2,8]
+    // Casilla 1,7 interior, 8 vecinos: 0,6 ,0,7 ,0,8 ,1,6 ,1,8 ,2,6 ,2,7 ,2,8
     {
       const casilla = tablero.matriz[1][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -575,7 +533,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,8] — interior, 8 vecinos: [0,7], [0,8], [0,9], [1,7], [1,9], [2,7], [2,8], [2,9]
+    // Casilla 1,8 interior, 8 vecinos: 0,7 ,0,8 ,0,9 ,1,7 ,1,9 ,2,7 ,2,8 ,2,9
     {
       const casilla = tablero.matriz[1][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -598,7 +556,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,9] — borde, 5 vecinos: [0,8], [0,9], [1,8], [2,8], [2,9]
+    // Casilla 1,9 borde, 5 vecinos: 0,8 ,0,9 ,1,8 ,2,8 ,2,9
     {
       const casilla = tablero.matriz[1][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -621,7 +579,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,0] — borde, 5 vecinos: [1,0], [1,1], [2,1], [3,0], [3,1]
+    // Casilla 2,0 borde, 5 vecinos: 1,0 ,1,1 ,2,1 ,3,0 ,3,1
     {
       const casilla = tablero.matriz[2][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -644,7 +602,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,1] — interior, 8 vecinos: [1,0], [1,1], [1,2], [2,0], [2,2], [3,0], [3,1], [3,2]
+    // Casilla 2,1 interior, 8 vecinos: 1,0 ,1,1 ,1,2 ,2,0 ,2,2 ,3,0 ,3,1 ,3,2
     {
       const casilla = tablero.matriz[2][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -667,7 +625,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,2] — interior, 8 vecinos: [1,1], [1,2], [1,3], [2,1], [2,3], [3,1], [3,2], [3,3]
+    // Casilla 2,2 interior, 8 vecinos: 1,1 ,1,2 ,1,3 ,2,1 ,2,3 ,3,1 ,3,2 ,3,3
     {
       const casilla = tablero.matriz[2][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -690,7 +648,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,3] — interior, 8 vecinos: [1,2], [1,3], [1,4], [2,2], [2,4], [3,2], [3,3], [3,4]
+    // Casilla 2,3 interior, 8 vecinos: 1,2 ,1,3 ,1,4 ,2,2 ,2,4 ,3,2 ,3,3 ,3,4
     {
       const casilla = tablero.matriz[2][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -713,7 +671,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,4] — interior, 8 vecinos: [1,3], [1,4], [1,5], [2,3], [2,5], [3,3], [3,4], [3,5]
+    // Casilla 2,4 interior, 8 vecinos: 1,3 ,1,4 ,1,5 ,2,3 ,2,5 ,3,3 ,3,4 ,3,5
     {
       const casilla = tablero.matriz[2][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -736,7 +694,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,5] — interior, 8 vecinos: [1,4], [1,5], [1,6], [2,4], [2,6], [3,4], [3,5], [3,6]
+    // Casilla 2,5 interior, 8 vecinos: 1,4 ,1,5 ,1,6 ,2,4 ,2,6 ,3,4 ,3,5 ,3,6
     {
       const casilla = tablero.matriz[2][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -759,7 +717,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,6] — interior, 8 vecinos: [1,5], [1,6], [1,7], [2,5], [2,7], [3,5], [3,6], [3,7]
+    // Casilla 2,6 interior, 8 vecinos: 1,5 ,1,6 ,1,7 ,2,5 ,2,7 ,3,5 ,3,6 ,3,7
     {
       const casilla = tablero.matriz[2][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -782,7 +740,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,7] — interior, 8 vecinos: [1,6], [1,7], [1,8], [2,6], [2,8], [3,6], [3,7], [3,8]
+    // Casilla 2,7 interior, 8 vecinos: 1,6 ,1,7 ,1,8 ,2,6 ,2,8 ,3,6 ,3,7 ,3,8
     {
       const casilla = tablero.matriz[2][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -805,7 +763,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,8] — interior, 8 vecinos: [1,7], [1,8], [1,9], [2,7], [2,9], [3,7], [3,8], [3,9]
+    // Casilla 2,8 interior, 8 vecinos: 1,7 ,1,8 ,1,9 ,2,7 ,2,9 ,3,7 ,3,8 ,3,9
     {
       const casilla = tablero.matriz[2][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -828,7 +786,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,9] — borde, 5 vecinos: [1,8], [1,9], [2,8], [3,8], [3,9]
+    // Casilla 2,9 borde, 5 vecinos: 1,8 ,1,9 ,2,8 ,3,8 ,3,9
     {
       const casilla = tablero.matriz[2][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -851,7 +809,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,0] — borde, 5 vecinos: [2,0], [2,1], [3,1], [4,0], [4,1]
+    // Casilla 3,0 borde, 5 vecinos: 2,0 ,2,1 ,3,1 ,4,0 ,4,1
     {
       const casilla = tablero.matriz[3][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -874,7 +832,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,1] — interior, 8 vecinos: [2,0], [2,1], [2,2], [3,0], [3,2], [4,0], [4,1], [4,2]
+    // Casilla 3,1 interior, 8 vecinos: 2,0 ,2,1 ,2,2 ,3,0 ,3,2 ,4,0 ,4,1 ,4,2
     {
       const casilla = tablero.matriz[3][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -897,7 +855,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,2] — interior, 8 vecinos: [2,1], [2,2], [2,3], [3,1], [3,3], [4,1], [4,2], [4,3]
+    // Casilla 3,2 interior, 8 vecinos: 2,1 ,2,2 ,2,3 ,3,1 ,3,3 ,4,1 ,4,2 ,4,3
     {
       const casilla = tablero.matriz[3][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -920,7 +878,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,3] — interior, 8 vecinos: [2,2], [2,3], [2,4], [3,2], [3,4], [4,2], [4,3], [4,4]
+    // Casilla 3,3 interior, 8 vecinos: 2,2 ,2,3 ,2,4 ,3,2 ,3,4 ,4,2 ,4,3 ,4,4
     {
       const casilla = tablero.matriz[3][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -943,7 +901,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,4] — interior, 8 vecinos: [2,3], [2,4], [2,5], [3,3], [3,5], [4,3], [4,4], [4,5]
+    // Casilla 3,4 interior, 8 vecinos: 2,3 ,2,4 ,2,5 ,3,3 ,3,5 ,4,3 ,4,4 ,4,5
     {
       const casilla = tablero.matriz[3][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -966,7 +924,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,5] — interior, 8 vecinos: [2,4], [2,5], [2,6], [3,4], [3,6], [4,4], [4,5], [4,6]
+    // Casilla 3,5 interior, 8 vecinos: 2,4 ,2,5 ,2,6 ,3,4 ,3,6 ,4,4 ,4,5 ,4,6
     {
       const casilla = tablero.matriz[3][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -989,7 +947,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,6] — interior, 8 vecinos: [2,5], [2,6], [2,7], [3,5], [3,7], [4,5], [4,6], [4,7]
+    // Casilla 3,6 interior, 8 vecinos: 2,5 ,2,6 ,2,7 ,3,5 ,3,7 ,4,5 ,4,6 ,4,7
     {
       const casilla = tablero.matriz[3][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1012,7 +970,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,7] — interior, 8 vecinos: [2,6], [2,7], [2,8], [3,6], [3,8], [4,6], [4,7], [4,8]
+    // Casilla 3,7 interior, 8 vecinos: 2,6 ,2,7 ,2,8 ,3,6 ,3,8 ,4,6 ,4,7 ,4,8
     {
       const casilla = tablero.matriz[3][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1035,7 +993,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,8] — interior, 8 vecinos: [2,7], [2,8], [2,9], [3,7], [3,9], [4,7], [4,8], [4,9]
+    // Casilla 3,8 interior, 8 vecinos: 2,7 ,2,8 ,2,9 ,3,7 ,3,9 ,4,7 ,4,8 ,4,9
     {
       const casilla = tablero.matriz[3][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1058,7 +1016,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,9] — borde, 5 vecinos: [2,8], [2,9], [3,8], [4,8], [4,9]
+    // Casilla 3,9 borde, 5 vecinos: 2,8 ,2,9 ,3,8 ,4,8 ,4,9
     {
       const casilla = tablero.matriz[3][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1081,7 +1039,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,0] — borde, 5 vecinos: [3,0], [3,1], [4,1], [5,0], [5,1]
+    // Casilla 4,0 borde, 5 vecinos: 3,0 ,3,1 ,4,1 ,5,0 ,5,1
     {
       const casilla = tablero.matriz[4][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1104,7 +1062,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,1] — interior, 8 vecinos: [3,0], [3,1], [3,2], [4,0], [4,2], [5,0], [5,1], [5,2]
+    // Casilla 4,1 interior, 8 vecinos: 3,0 ,3,1 ,3,2 ,4,0 ,4,2 ,5,0 ,5,1 ,5,2
     {
       const casilla = tablero.matriz[4][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1127,7 +1085,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,2] — interior, 8 vecinos: [3,1], [3,2], [3,3], [4,1], [4,3], [5,1], [5,2], [5,3]
+    // Casilla 4,2 interior, 8 vecinos: 3,1 ,3,2 ,3,3 ,4,1 ,4,3 ,5,1 ,5,2 ,5,3
     {
       const casilla = tablero.matriz[4][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1150,7 +1108,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,3] — interior, 8 vecinos: [3,2], [3,3], [3,4], [4,2], [4,4], [5,2], [5,3], [5,4]
+    // Casilla 4,3 interior, 8 vecinos: 3,2 ,3,3 ,3,4 ,4,2 ,4,4 ,5,2 ,5,3 ,5,4
     {
       const casilla = tablero.matriz[4][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1173,7 +1131,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,4] — interior, 8 vecinos: [3,3], [3,4], [3,5], [4,3], [4,5], [5,3], [5,4], [5,5]
+    // Casilla 4,4 interior, 8 vecinos: 3,3 ,3,4 ,3,5 ,4,3 ,4,5 ,5,3 ,5,4 ,5,5
     {
       const casilla = tablero.matriz[4][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1196,7 +1154,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,5] — interior, 8 vecinos: [3,4], [3,5], [3,6], [4,4], [4,6], [5,4], [5,5], [5,6]
+    // Casilla 4,5 interior, 8 vecinos: 3,4 ,3,5 ,3,6 ,4,4 ,4,6 ,5,4 ,5,5 ,5,6
     {
       const casilla = tablero.matriz[4][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1219,7 +1177,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,6] — interior, 8 vecinos: [3,5], [3,6], [3,7], [4,5], [4,7], [5,5], [5,6], [5,7]
+    // Casilla 4,6 interior, 8 vecinos: 3,5 ,3,6 ,3,7 ,4,5 ,4,7 ,5,5 ,5,6 ,5,7
     {
       const casilla = tablero.matriz[4][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1242,7 +1200,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,7] — interior, 8 vecinos: [3,6], [3,7], [3,8], [4,6], [4,8], [5,6], [5,7], [5,8]
+    // Casilla 4,7 interior, 8 vecinos: 3,6 ,3,7 ,3,8 ,4,6 ,4,8 ,5,6 ,5,7 ,5,8
     {
       const casilla = tablero.matriz[4][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1265,7 +1223,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,8] — interior, 8 vecinos: [3,7], [3,8], [3,9], [4,7], [4,9], [5,7], [5,8], [5,9]
+    // Casilla 4,8 interior, 8 vecinos: 3,7 ,3,8 ,3,9 ,4,7 ,4,9 ,5,7 ,5,8 ,5,9
     {
       const casilla = tablero.matriz[4][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1288,7 +1246,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,9] — borde, 5 vecinos: [3,8], [3,9], [4,8], [5,8], [5,9]
+    // Casilla 4,9 borde, 5 vecinos: 3,8 ,3,9 ,4,8 ,5,8 ,5,9
     {
       const casilla = tablero.matriz[4][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1311,7 +1269,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,0] — borde, 5 vecinos: [4,0], [4,1], [5,1], [6,0], [6,1]
+    // Casilla 5,0 borde, 5 vecinos: 4,0 ,4,1 ,5,1 ,6,0 ,6,1
     {
       const casilla = tablero.matriz[5][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1334,7 +1292,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,1] — interior, 8 vecinos: [4,0], [4,1], [4,2], [5,0], [5,2], [6,0], [6,1], [6,2]
+    // Casilla 5,1 interior, 8 vecinos: 4,0 ,4,1 ,4,2 ,5,0 ,5,2 ,6,0 ,6,1 ,6,2
     {
       const casilla = tablero.matriz[5][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1357,7 +1315,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,2] — interior, 8 vecinos: [4,1], [4,2], [4,3], [5,1], [5,3], [6,1], [6,2], [6,3]
+    // Casilla 5,2 interior, 8 vecinos: 4,1 ,4,2 ,4,3 ,5,1 ,5,3 ,6,1 ,6,2 ,6,3
     {
       const casilla = tablero.matriz[5][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1380,7 +1338,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,3] — interior, 8 vecinos: [4,2], [4,3], [4,4], [5,2], [5,4], [6,2], [6,3], [6,4]
+    // Casilla 5,3 interior, 8 vecinos: 4,2 ,4,3 ,4,4 ,5,2 ,5,4 ,6,2 ,6,3 ,6,4
     {
       const casilla = tablero.matriz[5][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1403,7 +1361,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,4] — interior, 8 vecinos: [4,3], [4,4], [4,5], [5,3], [5,5], [6,3], [6,4], [6,5]
+    // Casilla 5,4 interior, 8 vecinos: 4,3 ,4,4 ,4,5 ,5,3 ,5,5 ,6,3 ,6,4 ,6,5
     {
       const casilla = tablero.matriz[5][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1426,7 +1384,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,5] — interior, 8 vecinos: [4,4], [4,5], [4,6], [5,4], [5,6], [6,4], [6,5], [6,6]
+    // Casilla 5,5 interior, 8 vecinos: 4,4 ,4,5 ,4,6 ,5,4 ,5,6 ,6,4 ,6,5 ,6,6
     {
       const casilla = tablero.matriz[5][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1449,7 +1407,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,6] — interior, 8 vecinos: [4,5], [4,6], [4,7], [5,5], [5,7], [6,5], [6,6], [6,7]
+    // Casilla 5,6 interior, 8 vecinos: 4,5 ,4,6 ,4,7 ,5,5 ,5,7 ,6,5 ,6,6 ,6,7
     {
       const casilla = tablero.matriz[5][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1472,7 +1430,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,7] — interior, 8 vecinos: [4,6], [4,7], [4,8], [5,6], [5,8], [6,6], [6,7], [6,8]
+    // Casilla 5,7 interior, 8 vecinos: 4,6 ,4,7 ,4,8 ,5,6 ,5,8 ,6,6 ,6,7 ,6,8
     {
       const casilla = tablero.matriz[5][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1495,7 +1453,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,8] — interior, 8 vecinos: [4,7], [4,8], [4,9], [5,7], [5,9], [6,7], [6,8], [6,9]
+    // Casilla 5,8 interior, 8 vecinos: 4,7 ,4,8 ,4,9 ,5,7 ,5,9 ,6,7 ,6,8 ,6,9
     {
       const casilla = tablero.matriz[5][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1518,7 +1476,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,9] — borde, 5 vecinos: [4,8], [4,9], [5,8], [6,8], [6,9]
+    // Casilla 5,9 borde, 5 vecinos: 4,8 ,4,9 ,5,8 ,6,8 ,6,9
     {
       const casilla = tablero.matriz[5][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1541,7 +1499,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,0] — borde, 5 vecinos: [5,0], [5,1], [6,1], [7,0], [7,1]
+    // Casilla 6,0 borde, 5 vecinos: 5,0 ,5,1 ,6,1 ,7,0 ,7,1
     {
       const casilla = tablero.matriz[6][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1564,7 +1522,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,1] — interior, 8 vecinos: [5,0], [5,1], [5,2], [6,0], [6,2], [7,0], [7,1], [7,2]
+    // Casilla 6,1 interior, 8 vecinos: 5,0 ,5,1 ,5,2 ,6,0 ,6,2 ,7,0 ,7,1 ,7,2
     {
       const casilla = tablero.matriz[6][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1587,7 +1545,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,2] — interior, 8 vecinos: [5,1], [5,2], [5,3], [6,1], [6,3], [7,1], [7,2], [7,3]
+    // Casilla 6,2 interior, 8 vecinos: 5,1 ,5,2 ,5,3 ,6,1 ,6,3 ,7,1 ,7,2 ,7,3
     {
       const casilla = tablero.matriz[6][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1610,7 +1568,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,3] — interior, 8 vecinos: [5,2], [5,3], [5,4], [6,2], [6,4], [7,2], [7,3], [7,4]
+    // Casilla 6,3 interior, 8 vecinos: 5,2 ,5,3 ,5,4 ,6,2 ,6,4 ,7,2 ,7,3 ,7,4
     {
       const casilla = tablero.matriz[6][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1633,7 +1591,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,4] — interior, 8 vecinos: [5,3], [5,4], [5,5], [6,3], [6,5], [7,3], [7,4], [7,5]
+    // Casilla 6,4 interior, 8 vecinos: 5,3 ,5,4 ,5,5 ,6,3 ,6,5 ,7,3 ,7,4 ,7,5
     {
       const casilla = tablero.matriz[6][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1656,7 +1614,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,5] — interior, 8 vecinos: [5,4], [5,5], [5,6], [6,4], [6,6], [7,4], [7,5], [7,6]
+    // Casilla 6,5 interior, 8 vecinos: 5,4 ,5,5 ,5,6 ,6,4 ,6,6 ,7,4 ,7,5 ,7,6
     {
       const casilla = tablero.matriz[6][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1679,7 +1637,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,6] — interior, 8 vecinos: [5,5], [5,6], [5,7], [6,5], [6,7], [7,5], [7,6], [7,7]
+    // Casilla 6,6 interior, 8 vecinos: 5,5 ,5,6 ,5,7 ,6,5 ,6,7 ,7,5 ,7,6 ,7,7
     {
       const casilla = tablero.matriz[6][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1702,7 +1660,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,7] — interior, 8 vecinos: [5,6], [5,7], [5,8], [6,6], [6,8], [7,6], [7,7], [7,8]
+    // Casilla 6,7 interior, 8 vecinos: 5,6 ,5,7 ,5,8 ,6,6 ,6,8 ,7,6 ,7,7 ,7,8
     {
       const casilla = tablero.matriz[6][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1725,7 +1683,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,8] — interior, 8 vecinos: [5,7], [5,8], [5,9], [6,7], [6,9], [7,7], [7,8], [7,9]
+    // Casilla 6,8 interior, 8 vecinos: 5,7 ,5,8 ,5,9 ,6,7 ,6,9 ,7,7 ,7,8 ,7,9
     {
       const casilla = tablero.matriz[6][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1748,7 +1706,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,9] — borde, 5 vecinos: [5,8], [5,9], [6,8], [7,8], [7,9]
+    // Casilla 6,9 borde, 5 vecinos: 5,8 ,5,9 ,6,8 ,7,8 ,7,9
     {
       const casilla = tablero.matriz[6][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1771,7 +1729,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,0] — borde, 5 vecinos: [6,0], [6,1], [7,1], [8,0], [8,1]
+    // Casilla 7,0 borde, 5 vecinos: 6,0 ,6,1 ,7,1 ,8,0 ,8,1
     {
       const casilla = tablero.matriz[7][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1794,7 +1752,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,1] — interior, 8 vecinos: [6,0], [6,1], [6,2], [7,0], [7,2], [8,0], [8,1], [8,2]
+    // Casilla 7,1 interior, 8 vecinos: 6,0 ,6,1 ,6,2 ,7,0 ,7,2 ,8,0 ,8,1 ,8,2
     {
       const casilla = tablero.matriz[7][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1817,7 +1775,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,2] — interior, 8 vecinos: [6,1], [6,2], [6,3], [7,1], [7,3], [8,1], [8,2], [8,3]
+    // Casilla 7,2 interior, 8 vecinos: 6,1 ,6,2 ,6,3 ,7,1 ,7,3 ,8,1 ,8,2 ,8,3
     {
       const casilla = tablero.matriz[7][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1840,7 +1798,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,3] — interior, 8 vecinos: [6,2], [6,3], [6,4], [7,2], [7,4], [8,2], [8,3], [8,4]
+    // Casilla 7,3 interior, 8 vecinos: 6,2 ,6,3 ,6,4 ,7,2 ,7,4 ,8,2 ,8,3 ,8,4
     {
       const casilla = tablero.matriz[7][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1863,7 +1821,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,4] — interior, 8 vecinos: [6,3], [6,4], [6,5], [7,3], [7,5], [8,3], [8,4], [8,5]
+    // Casilla 7,4 interior, 8 vecinos: 6,3 ,6,4 ,6,5 ,7,3 ,7,5 ,8,3 ,8,4 ,8,5
     {
       const casilla = tablero.matriz[7][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1886,7 +1844,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,5] — interior, 8 vecinos: [6,4], [6,5], [6,6], [7,4], [7,6], [8,4], [8,5], [8,6]
+    // Casilla 7,5 interior, 8 vecinos: 6,4 ,6,5 ,6,6 ,7,4 ,7,6 ,8,4 ,8,5 ,8,6
     {
       const casilla = tablero.matriz[7][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1909,7 +1867,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,6] — interior, 8 vecinos: [6,5], [6,6], [6,7], [7,5], [7,7], [8,5], [8,6], [8,7]
+    // Casilla 7,6 interior, 8 vecinos: 6,5 ,6,6 ,6,7 ,7,5 ,7,7 ,8,5 ,8,6 ,8,7
     {
       const casilla = tablero.matriz[7][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1932,7 +1890,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,7] — interior, 8 vecinos: [6,6], [6,7], [6,8], [7,6], [7,8], [8,6], [8,7], [8,8]
+    // Casilla 7,7 interior, 8 vecinos: 6,6 ,6,7 ,6,8 ,7,6 ,7,8 ,8,6 ,8,7 ,8,8
     {
       const casilla = tablero.matriz[7][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1955,7 +1913,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,8] — interior, 8 vecinos: [6,7], [6,8], [6,9], [7,7], [7,9], [8,7], [8,8], [8,9]
+    // Casilla 7,8 interior, 8 vecinos: 6,7 ,6,8 ,6,9 ,7,7 ,7,9 ,8,7 ,8,8 ,8,9
     {
       const casilla = tablero.matriz[7][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -1978,7 +1936,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,9] — borde, 5 vecinos: [6,8], [6,9], [7,8], [8,8], [8,9]
+    // Casilla 7,9 borde, 5 vecinos: 6,8 ,6,9 ,7,8 ,8,8 ,8,9
     {
       const casilla = tablero.matriz[7][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2001,7 +1959,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,0] — borde, 5 vecinos: [7,0], [7,1], [8,1], [9,0], [9,1]
+    // Casilla 8,0 borde, 5 vecinos: 7,0 ,7,1 ,8,1 ,9,0 ,9,1
     {
       const casilla = tablero.matriz[8][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2024,7 +1982,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,1] — interior, 8 vecinos: [7,0], [7,1], [7,2], [8,0], [8,2], [9,0], [9,1], [9,2]
+    // Casilla 8,1 interior, 8 vecinos: 7,0 ,7,1 ,7,2 ,8,0 ,8,2 ,9,0 ,9,1 ,9,2
     {
       const casilla = tablero.matriz[8][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2047,7 +2005,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,2] — interior, 8 vecinos: [7,1], [7,2], [7,3], [8,1], [8,3], [9,1], [9,2], [9,3]
+    // Casilla 8,2 interior, 8 vecinos: 7,1 ,7,2 ,7,3 ,8,1 ,8,3 ,9,1 ,9,2 ,9,3
     {
       const casilla = tablero.matriz[8][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2070,7 +2028,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,3] — interior, 8 vecinos: [7,2], [7,3], [7,4], [8,2], [8,4], [9,2], [9,3], [9,4]
+    // Casilla 8,3 interior, 8 vecinos: 7,2 ,7,3 ,7,4 ,8,2 ,8,4 ,9,2 ,9,3 ,9,4
     {
       const casilla = tablero.matriz[8][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2093,7 +2051,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,4] — interior, 8 vecinos: [7,3], [7,4], [7,5], [8,3], [8,5], [9,3], [9,4], [9,5]
+    // Casilla 8,4 interior, 8 vecinos: 7,3 ,7,4 ,7,5 ,8,3 ,8,5 ,9,3 ,9,4 ,9,5
     {
       const casilla = tablero.matriz[8][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2116,7 +2074,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,5] — interior, 8 vecinos: [7,4], [7,5], [7,6], [8,4], [8,6], [9,4], [9,5], [9,6]
+    // Casilla 8,5 interior, 8 vecinos: 7,4 ,7,5 ,7,6 ,8,4 ,8,6 ,9,4 ,9,5 ,9,6
     {
       const casilla = tablero.matriz[8][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2139,7 +2097,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,6] — interior, 8 vecinos: [7,5], [7,6], [7,7], [8,5], [8,7], [9,5], [9,6], [9,7]
+    // Casilla 8,6 interior, 8 vecinos: 7,5 ,7,6 ,7,7 ,8,5 ,8,7 ,9,5 ,9,6 ,9,7
     {
       const casilla = tablero.matriz[8][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2162,7 +2120,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,7] — interior, 8 vecinos: [7,6], [7,7], [7,8], [8,6], [8,8], [9,6], [9,7], [9,8]
+    // Casilla 8,7 interior, 8 vecinos: 7,6 ,7,7 ,7,8 ,8,6 ,8,8 ,9,6 ,9,7 ,9,8
     {
       const casilla = tablero.matriz[8][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2185,7 +2143,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,8] — interior, 8 vecinos: [7,7], [7,8], [7,9], [8,7], [8,9], [9,7], [9,8], [9,9]
+    // Casilla 8,8 interior, 8 vecinos: 7,7 ,7,8 ,7,9 ,8,7 ,8,9 ,9,7 ,9,8 ,9,9
     {
       const casilla = tablero.matriz[8][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2208,7 +2166,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,9] — borde, 5 vecinos: [7,8], [7,9], [8,8], [9,8], [9,9]
+    // Casilla 8,9 borde, 5 vecinos: 7,8 ,7,9 ,8,8 ,9,8 ,9,9
     {
       const casilla = tablero.matriz[8][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2231,7 +2189,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,0] — esquina, 3 vecinos: [8,0], [8,1], [9,1]
+    // Casilla 9,0 esquina, 3 vecinos: 8,0 ,8,1 ,9,1
     {
       const casilla = tablero.matriz[9][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2254,7 +2212,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,1] — borde, 5 vecinos: [8,0], [8,1], [8,2], [9,0], [9,2]
+    // Casilla 9,1 borde, 5 vecinos: 8,0 ,8,1 ,8,2 ,9,0 ,9,2
     {
       const casilla = tablero.matriz[9][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2277,7 +2235,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,2] — borde, 5 vecinos: [8,1], [8,2], [8,3], [9,1], [9,3]
+    // Casilla 9,2 borde, 5 vecinos: 8,1 ,8,2 ,8,3 ,9,1 ,9,3
     {
       const casilla = tablero.matriz[9][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2300,7 +2258,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,3] — borde, 5 vecinos: [8,2], [8,3], [8,4], [9,2], [9,4]
+    // Casilla 9,3 borde, 5 vecinos: 8,2 ,8,3 ,8,4 ,9,2 ,9,4
     {
       const casilla = tablero.matriz[9][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2323,7 +2281,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,4] — borde, 5 vecinos: [8,3], [8,4], [8,5], [9,3], [9,5]
+    // Casilla 9,4 borde, 5 vecinos: 8,3 ,8,4 ,8,5 ,9,3 ,9,5
     {
       const casilla = tablero.matriz[9][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2346,7 +2304,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,5] — borde, 5 vecinos: [8,4], [8,5], [8,6], [9,4], [9,6]
+    // Casilla 9,5 borde, 5 vecinos: 8,4 ,8,5 ,8,6 ,9,4 ,9,6
     {
       const casilla = tablero.matriz[9][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2369,7 +2327,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,6] — borde, 5 vecinos: [8,5], [8,6], [8,7], [9,5], [9,7]
+    // Casilla 9,6 borde, 5 vecinos: 8,5 ,8,6 ,8,7 ,9,5 ,9,7
     {
       const casilla = tablero.matriz[9][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2392,7 +2350,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,7] — borde, 5 vecinos: [8,6], [8,7], [8,8], [9,6], [9,8]
+    // Casilla 9,7 borde, 5 vecinos: 8,6 ,8,7 ,8,8 ,9,6 ,9,8
     {
       const casilla = tablero.matriz[9][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2415,7 +2373,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,8] — borde, 5 vecinos: [8,7], [8,8], [8,9], [9,7], [9,9]
+    // Casilla 9,8 borde, 5 vecinos: 8,7 ,8,8 ,8,9 ,9,7 ,9,9
     {
       const casilla = tablero.matriz[9][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2438,7 +2396,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,9] — esquina, 3 vecinos: [8,8], [8,9], [9,8]
+    // Casilla 9,9 esquina, 3 vecinos: 8,8 ,8,9 ,9,8
     {
       const casilla = tablero.matriz[9][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2465,15 +2423,11 @@ export class IABuscaminasServicio {
     return null;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // CAPA 2 — COMPARACIÓN DE GRUPOS (explícita por cada casilla del tablero 10x10)
-  // ─────────────────────────────────────────────────────────────────────────
+  
+  // CAPA 2
 
-  /**
-   * Compara pares de grupos: si el grupo A está contenido en B y la diferencia de
-   * minas faltantes coincide con las casillas extra, esas casillas extra son minas.
-   * Solo marca minas — la jugada segura la busca buscarJugadaSeguraPorLogica después.
-   */
+   // Aplica la comparación de grupos de analisis para deducir casillas seguras o minas
+
   private aplicarComparacionDeGrupos(tablero: Tablero): void {
     const grupos = this.construirGruposAnalisis(tablero);
     for (let i = 0; i < grupos.length; i++) {
@@ -2493,15 +2447,11 @@ export class IABuscaminasServicio {
     }
   }
 
-  /**
-   * Construye los grupos de análisis del tablero.
-   * Cada grupo = una casilla abierta con número + sus vecinos cerrados no marcados.
-   * Escrito explícitamente para cada una de las 100 posiciones del tablero 10x10.
-   */
+  // Construye grupos de analisis a partir de las casillas abiertas del tablero, identificando las casillas cerradas alrededor y las minas faltantes para cada una
   private construirGruposAnalisis(tablero: Tablero): Array<{ filaCentral: number; columnaCentral: number; casillasCerradas: Casilla[]; minasFaltantes: number }> {
     const grupos: Array<{ filaCentral: number; columnaCentral: number; casillasCerradas: Casilla[]; minasFaltantes: number }> = [];
 
-    // ── Casilla [0,0] — esquina, 3 vecinos: [0,1], [1,0], [1,1]
+    // Casilla 0,0 esquina, 3 vecinos: 0,1 ,1,0 ,1,1
     {
       const casilla = tablero.matriz[0][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2515,7 +2465,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,1] — borde, 5 vecinos: [0,0], [0,2], [1,0], [1,1], [1,2]
+    // Casilla 0,1 borde, 5 vecinos: 0,0 ,0,2 ,1,0 ,1,1 ,1,2
     {
       const casilla = tablero.matriz[0][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2529,7 +2479,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,2] — borde, 5 vecinos: [0,1], [0,3], [1,1], [1,2], [1,3]
+    // Casilla 0,2 borde, 5 vecinos: 0,1 ,0,3 ,1,1 ,1,2 ,1,3
     {
       const casilla = tablero.matriz[0][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2543,7 +2493,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,3] — borde, 5 vecinos: [0,2], [0,4], [1,2], [1,3], [1,4]
+    // Casilla 0,3 borde, 5 vecinos: 0,2 ,0,4 ,1,2 ,1,3 ,1,4
     {
       const casilla = tablero.matriz[0][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2557,7 +2507,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,4] — borde, 5 vecinos: [0,3], [0,5], [1,3], [1,4], [1,5]
+    // Casilla 0,4 borde, 5 vecinos: 0,3 ,0,5 ,1,3 ,1,4 ,1,5
     {
       const casilla = tablero.matriz[0][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2571,7 +2521,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,5] — borde, 5 vecinos: [0,4], [0,6], [1,4], [1,5], [1,6]
+    // Casilla 0,5 borde, 5 vecinos: 0,4 ,0,6 ,1,4 ,1,5 ,1,6
     {
       const casilla = tablero.matriz[0][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2585,7 +2535,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,6] — borde, 5 vecinos: [0,5], [0,7], [1,5], [1,6], [1,7]
+    // Casilla 0,6 borde, 5 vecinos: 0,5 ,0,7 ,1,5 ,1,6 ,1,7
     {
       const casilla = tablero.matriz[0][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2599,7 +2549,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,7] — borde, 5 vecinos: [0,6], [0,8], [1,6], [1,7], [1,8]
+    // Casilla 0,7 borde, 5 vecinos: 0,6 ,0,8 ,1,6 ,1,7 ,1,8
     {
       const casilla = tablero.matriz[0][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2613,7 +2563,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,8] — borde, 5 vecinos: [0,7], [0,9], [1,7], [1,8], [1,9]
+    // Casilla 0,8 borde, 5 vecinos: 0,7 ,0,9 ,1,7 ,1,8 ,1,9
     {
       const casilla = tablero.matriz[0][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2627,7 +2577,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,9] — esquina, 3 vecinos: [0,8], [1,8], [1,9]
+    // Casilla 0,9 esquina, 3 vecinos: 0,8 ,1,8 ,1,9
     {
       const casilla = tablero.matriz[0][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2641,7 +2591,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,0] — borde, 5 vecinos: [0,0], [0,1], [1,1], [2,0], [2,1]
+    // Casilla 1,0 borde, 5 vecinos: 0,0 ,0,1 ,1,1 ,2,0 ,2,1
     {
       const casilla = tablero.matriz[1][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2655,7 +2605,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,1] — interior, 8 vecinos: [0,0], [0,1], [0,2], [1,0], [1,2], [2,0], [2,1], [2,2]
+    // Casilla 1,1 interior, 8 vecinos: 0,0 ,0,1 ,0,2 ,1,0 ,1,2 ,2,0 ,2,1 ,2,2
     {
       const casilla = tablero.matriz[1][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2669,7 +2619,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,2] — interior, 8 vecinos: [0,1], [0,2], [0,3], [1,1], [1,3], [2,1], [2,2], [2,3]
+    // Casilla 1,2 interior, 8 vecinos: 0,1 ,0,2 ,0,3 ,1,1 ,1,3 ,2,1 ,2,2 ,2,3
     {
       const casilla = tablero.matriz[1][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2683,7 +2633,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,3] — interior, 8 vecinos: [0,2], [0,3], [0,4], [1,2], [1,4], [2,2], [2,3], [2,4]
+    // Casilla 1,3 interior, 8 vecinos: 0,2 ,0,3 ,0,4 ,1,2 ,1,4 ,2,2 ,2,3 ,2,4
     {
       const casilla = tablero.matriz[1][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2697,7 +2647,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,4] — interior, 8 vecinos: [0,3], [0,4], [0,5], [1,3], [1,5], [2,3], [2,4], [2,5]
+    // Casilla 1,4 interior, 8 vecinos: 0,3 ,0,4 ,0,5 ,1,3 ,1,5 ,2,3 ,2,4 ,2,5
     {
       const casilla = tablero.matriz[1][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2711,7 +2661,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,5] — interior, 8 vecinos: [0,4], [0,5], [0,6], [1,4], [1,6], [2,4], [2,5], [2,6]
+    // Casilla 1,5 interior, 8 vecinos: 0,4 ,0,5 ,0,6 ,1,4 ,1,6 ,2,4 ,2,5 ,2,6
     {
       const casilla = tablero.matriz[1][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2725,7 +2675,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,6] — interior, 8 vecinos: [0,5], [0,6], [0,7], [1,5], [1,7], [2,5], [2,6], [2,7]
+    // Casilla 1,6 interior, 8 vecinos: 0,5 ,0,6 ,0,7 ,1,5 ,1,7 ,2,5 ,2,6 ,2,7
     {
       const casilla = tablero.matriz[1][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2739,7 +2689,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,7] — interior, 8 vecinos: [0,6], [0,7], [0,8], [1,6], [1,8], [2,6], [2,7], [2,8]
+    // Casilla 1,7 interior, 8 vecinos: 0,6 ,0,7 ,0,8 ,1,6 ,1,8 ,2,6 ,2,7 ,2,8
     {
       const casilla = tablero.matriz[1][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2753,7 +2703,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,8] — interior, 8 vecinos: [0,7], [0,8], [0,9], [1,7], [1,9], [2,7], [2,8], [2,9]
+    // Casilla 1,8 interior, 8 vecinos: 0,7 ,0,8 ,0,9 ,1,7 ,1,9 ,2,7 ,2,8 ,2,9
     {
       const casilla = tablero.matriz[1][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2767,7 +2717,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,9] — borde, 5 vecinos: [0,8], [0,9], [1,8], [2,8], [2,9]
+    // Casilla 1,9 borde, 5 vecinos: 0,8 ,0,9 ,1,8 ,2,8 ,2,9
     {
       const casilla = tablero.matriz[1][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2781,7 +2731,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,0] — borde, 5 vecinos: [1,0], [1,1], [2,1], [3,0], [3,1]
+    // Casilla 2,0 borde, 5 vecinos: 1,0 ,1,1 ,2,1 ,3,0 ,3,1
     {
       const casilla = tablero.matriz[2][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2795,7 +2745,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,1] — interior, 8 vecinos: [1,0], [1,1], [1,2], [2,0], [2,2], [3,0], [3,1], [3,2]
+    // Casilla 2,1 interior, 8 vecinos: 1,0 ,1,1 ,1,2 ,2,0 ,2,2 ,3,0 ,3,1 ,3,2
     {
       const casilla = tablero.matriz[2][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2809,7 +2759,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,2] — interior, 8 vecinos: [1,1], [1,2], [1,3], [2,1], [2,3], [3,1], [3,2], [3,3]
+    // Casilla 2,2 interior, 8 vecinos: 1,1 ,1,2 ,1,3 ,2,1 ,2,3 ,3,1 ,3,2 ,3,3
     {
       const casilla = tablero.matriz[2][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2823,7 +2773,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,3] — interior, 8 vecinos: [1,2], [1,3], [1,4], [2,2], [2,4], [3,2], [3,3], [3,4]
+    // Casilla 2,3 interior, 8 vecinos: 1,2 ,1,3 ,1,4 ,2,2 ,2,4 ,3,2 ,3,3 ,3,4
     {
       const casilla = tablero.matriz[2][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2837,7 +2787,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,4] — interior, 8 vecinos: [1,3], [1,4], [1,5], [2,3], [2,5], [3,3], [3,4], [3,5]
+    // Casilla 2,4 interior, 8 vecinos: 1,3 ,1,4 ,1,5 ,2,3 ,2,5 ,3,3 ,3,4 ,3,5
     {
       const casilla = tablero.matriz[2][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2851,7 +2801,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,5] — interior, 8 vecinos: [1,4], [1,5], [1,6], [2,4], [2,6], [3,4], [3,5], [3,6]
+    // Casilla 2,5 interior, 8 vecinos: 1,4 ,1,5 ,1,6 ,2,4 ,2,6 ,3,4 ,3,5 ,3,6
     {
       const casilla = tablero.matriz[2][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2865,7 +2815,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,6] — interior, 8 vecinos: [1,5], [1,6], [1,7], [2,5], [2,7], [3,5], [3,6], [3,7]
+    // Casilla 2,6 interior, 8 vecinos: 1,5 ,1,6 ,1,7 ,2,5 ,2,7 ,3,5 ,3,6 ,3,7
     {
       const casilla = tablero.matriz[2][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2879,7 +2829,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,7] — interior, 8 vecinos: [1,6], [1,7], [1,8], [2,6], [2,8], [3,6], [3,7], [3,8]
+    // Casilla 2,7 interior, 8 vecinos: 1,6 ,1,7 ,1,8 ,2,6 ,2,8 ,3,6 ,3,7 ,3,8
     {
       const casilla = tablero.matriz[2][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2893,7 +2843,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,8] — interior, 8 vecinos: [1,7], [1,8], [1,9], [2,7], [2,9], [3,7], [3,8], [3,9]
+    // Casilla 2,8 interior, 8 vecinos: 1,7 ,1,8 ,1,9 ,2,7 ,2,9 ,3,7 ,3,8 ,3,9
     {
       const casilla = tablero.matriz[2][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2907,7 +2857,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,9] — borde, 5 vecinos: [1,8], [1,9], [2,8], [3,8], [3,9]
+    // Casilla 2,9 borde, 5 vecinos: 1,8 ,1,9 ,2,8 ,3,8 ,3,9
     {
       const casilla = tablero.matriz[2][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2921,7 +2871,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,0] — borde, 5 vecinos: [2,0], [2,1], [3,1], [4,0], [4,1]
+    // Casilla 3,0 borde, 5 vecinos: 2,0 ,2,1 ,3,1 ,4,0 ,4,1
     {
       const casilla = tablero.matriz[3][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2935,7 +2885,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,1] — interior, 8 vecinos: [2,0], [2,1], [2,2], [3,0], [3,2], [4,0], [4,1], [4,2]
+    // Casilla 3,1 interior, 8 vecinos: 2,0 ,2,1 ,2,2 ,3,0 ,3,2 ,4,0 ,4,1 ,4,2
     {
       const casilla = tablero.matriz[3][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2949,7 +2899,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,2] — interior, 8 vecinos: [2,1], [2,2], [2,3], [3,1], [3,3], [4,1], [4,2], [4,3]
+    // Casilla 3,2 interior, 8 vecinos: 2,1 ,2,2 ,2,3 ,3,1 ,3,3 ,4,1 ,4,2 ,4,3
     {
       const casilla = tablero.matriz[3][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2963,7 +2913,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,3] — interior, 8 vecinos: [2,2], [2,3], [2,4], [3,2], [3,4], [4,2], [4,3], [4,4]
+    // Casilla 3,3 interior, 8 vecinos: 2,2 ,2,3 ,2,4 ,3,2 ,3,4 ,4,2 ,4,3 ,4,4
     {
       const casilla = tablero.matriz[3][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2977,7 +2927,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,4] — interior, 8 vecinos: [2,3], [2,4], [2,5], [3,3], [3,5], [4,3], [4,4], [4,5]
+    // Casilla 3,4 interior, 8 vecinos: 2,3 ,2,4 ,2,5 ,3,3 ,3,5 ,4,3 ,4,4 ,4,5
     {
       const casilla = tablero.matriz[3][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -2991,7 +2941,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,5] — interior, 8 vecinos: [2,4], [2,5], [2,6], [3,4], [3,6], [4,4], [4,5], [4,6]
+    // Casilla 3,5 interior, 8 vecinos: 2,4 ,2,5 ,2,6 ,3,4 ,3,6 ,4,4 ,4,5 ,4,6
     {
       const casilla = tablero.matriz[3][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3005,7 +2955,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,6] — interior, 8 vecinos: [2,5], [2,6], [2,7], [3,5], [3,7], [4,5], [4,6], [4,7]
+    // Casilla 3,6 interior, 8 vecinos: 2,5 ,2,6 ,2,7 ,3,5 ,3,7 ,4,5 ,4,6 ,4,7
     {
       const casilla = tablero.matriz[3][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3019,7 +2969,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,7] — interior, 8 vecinos: [2,6], [2,7], [2,8], [3,6], [3,8], [4,6], [4,7], [4,8]
+    // Casilla 3,7 interior, 8 vecinos: 2,6 ,2,7 ,2,8 ,3,6 ,3,8 ,4,6 ,4,7 ,4,8
     {
       const casilla = tablero.matriz[3][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3033,7 +2983,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,8] — interior, 8 vecinos: [2,7], [2,8], [2,9], [3,7], [3,9], [4,7], [4,8], [4,9]
+    // Casilla 3,8 interior, 8 vecinos: 2,7 ,2,8 ,2,9 ,3,7 ,3,9 ,4,7 ,4,8 ,4,9
     {
       const casilla = tablero.matriz[3][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3047,7 +2997,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,9] — borde, 5 vecinos: [2,8], [2,9], [3,8], [4,8], [4,9]
+    // Casilla 3,9 borde, 5 vecinos: 2,8 ,2,9 ,3,8 ,4,8 ,4,9
     {
       const casilla = tablero.matriz[3][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3061,7 +3011,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,0] — borde, 5 vecinos: [3,0], [3,1], [4,1], [5,0], [5,1]
+    // Casilla 4,0 borde, 5 vecinos: 3,0 ,3,1 ,4,1 ,5,0 ,5,1
     {
       const casilla = tablero.matriz[4][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3075,7 +3025,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,1] — interior, 8 vecinos: [3,0], [3,1], [3,2], [4,0], [4,2], [5,0], [5,1], [5,2]
+    // Casilla 4,1 interior, 8 vecinos: 3,0 ,3,1 ,3,2 ,4,0 ,4,2 ,5,0 ,5,1 ,5,2
     {
       const casilla = tablero.matriz[4][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3089,7 +3039,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,2] — interior, 8 vecinos: [3,1], [3,2], [3,3], [4,1], [4,3], [5,1], [5,2], [5,3]
+    // Casilla 4,2 interior, 8 vecinos: 3,1 ,3,2 ,3,3 ,4,1 ,4,3 ,5,1 ,5,2 ,5,3
     {
       const casilla = tablero.matriz[4][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3103,7 +3053,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,3] — interior, 8 vecinos: [3,2], [3,3], [3,4], [4,2], [4,4], [5,2], [5,3], [5,4]
+    // Casilla 4,3 interior, 8 vecinos: 3,2 ,3,3 ,3,4 ,4,2 ,4,4 ,5,2 ,5,3 ,5,4
     {
       const casilla = tablero.matriz[4][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3117,7 +3067,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,4] — interior, 8 vecinos: [3,3], [3,4], [3,5], [4,3], [4,5], [5,3], [5,4], [5,5]
+    // Casilla 4,4 interior, 8 vecinos: 3,3 ,3,4 ,3,5 ,4,3 ,4,5 ,5,3 ,5,4 ,5,5
     {
       const casilla = tablero.matriz[4][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3131,7 +3081,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,5] — interior, 8 vecinos: [3,4], [3,5], [3,6], [4,4], [4,6], [5,4], [5,5], [5,6]
+    // Casilla 4,5 interior, 8 vecinos: 3,4 ,3,5 ,3,6 ,4,4 ,4,6 ,5,4 ,5,5 ,5,6
     {
       const casilla = tablero.matriz[4][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3145,7 +3095,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,6] — interior, 8 vecinos: [3,5], [3,6], [3,7], [4,5], [4,7], [5,5], [5,6], [5,7]
+    // Casilla 4,6 interior, 8 vecinos: 3,5 ,3,6 ,3,7 ,4,5 ,4,7 ,5,5 ,5,6 ,5,7
     {
       const casilla = tablero.matriz[4][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3159,7 +3109,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,7] — interior, 8 vecinos: [3,6], [3,7], [3,8], [4,6], [4,8], [5,6], [5,7], [5,8]
+    // Casilla 4,7 interior, 8 vecinos: 3,6 ,3,7 ,3,8 ,4,6 ,4,8 ,5,6 ,5,7 ,5,8
     {
       const casilla = tablero.matriz[4][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3173,7 +3123,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,8] — interior, 8 vecinos: [3,7], [3,8], [3,9], [4,7], [4,9], [5,7], [5,8], [5,9]
+    // Casilla 4,8 interior, 8 vecinos: 3,7 ,3,8 ,3,9 ,4,7 ,4,9 ,5,7 ,5,8 ,5,9
     {
       const casilla = tablero.matriz[4][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3187,7 +3137,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,9] — borde, 5 vecinos: [3,8], [3,9], [4,8], [5,8], [5,9]
+    // Casilla 4,9 borde, 5 vecinos: 3,8 ,3,9 ,4,8 ,5,8 ,5,9
     {
       const casilla = tablero.matriz[4][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3201,7 +3151,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,0] — borde, 5 vecinos: [4,0], [4,1], [5,1], [6,0], [6,1]
+    // Casilla 5,0 borde, 5 vecinos: 4,0 ,4,1 ,5,1 ,6,0 ,6,1
     {
       const casilla = tablero.matriz[5][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3215,7 +3165,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,1] — interior, 8 vecinos: [4,0], [4,1], [4,2], [5,0], [5,2], [6,0], [6,1], [6,2]
+    // Casilla 5,1 interior, 8 vecinos: 4,0 ,4,1 ,4,2 ,5,0 ,5,2 ,6,0 ,6,1 ,6,2
     {
       const casilla = tablero.matriz[5][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3229,7 +3179,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,2] — interior, 8 vecinos: [4,1], [4,2], [4,3], [5,1], [5,3], [6,1], [6,2], [6,3]
+    // Casilla 5,2 interior, 8 vecinos: 4,1 ,4,2 ,4,3 ,5,1 ,5,3 ,6,1 ,6,2 ,6,3
     {
       const casilla = tablero.matriz[5][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3243,7 +3193,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,3] — interior, 8 vecinos: [4,2], [4,3], [4,4], [5,2], [5,4], [6,2], [6,3], [6,4]
+    // Casilla 5,3 interior, 8 vecinos: 4,2 ,4,3 ,4,4 ,5,2 ,5,4 ,6,2 ,6,3 ,6,4
     {
       const casilla = tablero.matriz[5][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3257,7 +3207,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,4] — interior, 8 vecinos: [4,3], [4,4], [4,5], [5,3], [5,5], [6,3], [6,4], [6,5]
+    // Casilla 5,4 interior, 8 vecinos: 4,3 ,4,4 ,4,5 ,5,3 ,5,5 ,6,3 ,6,4 ,6,5
     {
       const casilla = tablero.matriz[5][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3271,7 +3221,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,5] — interior, 8 vecinos: [4,4], [4,5], [4,6], [5,4], [5,6], [6,4], [6,5], [6,6]
+    // Casilla 5,5 interior, 8 vecinos: 4,4 ,4,5 ,4,6 ,5,4 ,5,6 ,6,4 ,6,5 ,6,6
     {
       const casilla = tablero.matriz[5][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3285,7 +3235,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,6] — interior, 8 vecinos: [4,5], [4,6], [4,7], [5,5], [5,7], [6,5], [6,6], [6,7]
+    // Casilla 5,6 interior, 8 vecinos: 4,5 ,4,6 ,4,7 ,5,5 ,5,7 ,6,5 ,6,6 ,6,7
     {
       const casilla = tablero.matriz[5][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3299,7 +3249,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,7] — interior, 8 vecinos: [4,6], [4,7], [4,8], [5,6], [5,8], [6,6], [6,7], [6,8]
+    // Casilla 5,7 interior, 8 vecinos: 4,6 ,4,7 ,4,8 ,5,6 ,5,8 ,6,6 ,6,7 ,6,8
     {
       const casilla = tablero.matriz[5][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3313,7 +3263,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,8] — interior, 8 vecinos: [4,7], [4,8], [4,9], [5,7], [5,9], [6,7], [6,8], [6,9]
+    // Casilla 5,8 interior, 8 vecinos: 4,7 ,4,8 ,4,9 ,5,7 ,5,9 ,6,7 ,6,8 ,6,9
     {
       const casilla = tablero.matriz[5][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3327,7 +3277,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,9] — borde, 5 vecinos: [4,8], [4,9], [5,8], [6,8], [6,9]
+    // Casilla 5,9 borde, 5 vecinos: 4,8 ,4,9 ,5,8 ,6,8 ,6,9
     {
       const casilla = tablero.matriz[5][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3341,7 +3291,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,0] — borde, 5 vecinos: [5,0], [5,1], [6,1], [7,0], [7,1]
+    // Casilla 6,0 borde, 5 vecinos: 5,0 ,5,1 ,6,1 ,7,0 ,7,1
     {
       const casilla = tablero.matriz[6][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3355,7 +3305,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,1] — interior, 8 vecinos: [5,0], [5,1], [5,2], [6,0], [6,2], [7,0], [7,1], [7,2]
+    // Casilla 6,1 interior, 8 vecinos: 5,0 ,5,1 ,5,2 ,6,0 ,6,2 ,7,0 ,7,1 ,7,2
     {
       const casilla = tablero.matriz[6][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3369,7 +3319,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,2] — interior, 8 vecinos: [5,1], [5,2], [5,3], [6,1], [6,3], [7,1], [7,2], [7,3]
+    // Casilla 6,2 interior, 8 vecinos: 5,1 ,5,2 ,5,3 ,6,1 ,6,3 ,7,1 ,7,2 ,7,3
     {
       const casilla = tablero.matriz[6][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3383,7 +3333,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,3] — interior, 8 vecinos: [5,2], [5,3], [5,4], [6,2], [6,4], [7,2], [7,3], [7,4]
+    // Casilla 6,3 interior, 8 vecinos: 5,2 ,5,3 ,5,4 ,6,2 ,6,4 ,7,2 ,7,3 ,7,4
     {
       const casilla = tablero.matriz[6][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3397,7 +3347,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,4] — interior, 8 vecinos: [5,3], [5,4], [5,5], [6,3], [6,5], [7,3], [7,4], [7,5]
+    // Casilla 6,4 interior, 8 vecinos: 5,3 ,5,4 ,5,5 ,6,3 ,6,5 ,7,3 ,7,4 ,7,5
     {
       const casilla = tablero.matriz[6][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3411,7 +3361,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,5] — interior, 8 vecinos: [5,4], [5,5], [5,6], [6,4], [6,6], [7,4], [7,5], [7,6]
+    // Casilla 6,5 interior, 8 vecinos: 5,4 ,5,5 ,5,6 ,6,4 ,6,6 ,7,4 ,7,5 ,7,6
     {
       const casilla = tablero.matriz[6][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3425,7 +3375,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,6] — interior, 8 vecinos: [5,5], [5,6], [5,7], [6,5], [6,7], [7,5], [7,6], [7,7]
+    // Casilla 6,6 interior, 8 vecinos: 5,5 ,5,6 ,5,7 ,6,5 ,6,7 ,7,5 ,7,6 ,7,7
     {
       const casilla = tablero.matriz[6][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3439,7 +3389,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,7] — interior, 8 vecinos: [5,6], [5,7], [5,8], [6,6], [6,8], [7,6], [7,7], [7,8]
+    // Casilla 6,7 interior, 8 vecinos: 5,6 ,5,7 ,5,8 ,6,6 ,6,8 ,7,6 ,7,7 ,7,8
     {
       const casilla = tablero.matriz[6][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3453,7 +3403,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,8] — interior, 8 vecinos: [5,7], [5,8], [5,9], [6,7], [6,9], [7,7], [7,8], [7,9]
+    // Casilla 6,8 interior, 8 vecinos: 5,7 ,5,8 ,5,9 ,6,7 ,6,9 ,7,7 ,7,8 ,7,9
     {
       const casilla = tablero.matriz[6][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3467,7 +3417,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,9] — borde, 5 vecinos: [5,8], [5,9], [6,8], [7,8], [7,9]
+    // Casilla 6,9 borde, 5 vecinos: 5,8 ,5,9 ,6,8 ,7,8 ,7,
     {
       const casilla = tablero.matriz[6][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3481,7 +3431,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,0] — borde, 5 vecinos: [6,0], [6,1], [7,1], [8,0], [8,1]
+    // Casilla 7,0 borde, 5 vecinos: 6,0 ,6,1 ,7,1 ,8,0 ,8,1
     {
       const casilla = tablero.matriz[7][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3495,7 +3445,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,1] — interior, 8 vecinos: [6,0], [6,1], [6,2], [7,0], [7,2], [8,0], [8,1], [8,2]
+    // Casilla 7,1 interior, 8 vecinos: 6,0 ,6,1 ,6,2 ,7,0 ,7,2 ,8,0 ,8,1 ,8,2
     {
       const casilla = tablero.matriz[7][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3509,7 +3459,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,2] — interior, 8 vecinos: [6,1], [6,2], [6,3], [7,1], [7,3], [8,1], [8,2], [8,3]
+    // Casilla 7,2 interior, 8 vecinos: 6,1 ,6,2 ,6,3 ,7,1 ,7,3 ,8,1 ,8,2 ,8,3
     {
       const casilla = tablero.matriz[7][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3523,7 +3473,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,3] — interior, 8 vecinos: [6,2], [6,3], [6,4], [7,2], [7,4], [8,2], [8,3], [8,4]
+    // Casilla 7,3 interior, 8 vecinos: 6,2 ,6,3 ,6,4 ,7,2 ,7,4 ,8,2 ,8,3 ,8,4
     {
       const casilla = tablero.matriz[7][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3537,7 +3487,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,4] — interior, 8 vecinos: [6,3], [6,4], [6,5], [7,3], [7,5], [8,3], [8,4], [8,5]
+    // Casilla 7,4 interior, 8 vecinos: 6,3 ,6,4 ,6,5 ,7,3 ,7,5 ,8,3 ,8,4 ,8,5
     {
       const casilla = tablero.matriz[7][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3551,7 +3501,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,5] — interior, 8 vecinos: [6,4], [6,5], [6,6], [7,4], [7,6], [8,4], [8,5], [8,6]
+    // Casilla 7,5 interior, 8 vecinos: 6,4 ,6,5 ,6,6 ,7,4 ,7,6 ,8,4 ,8,5 ,8,6
     {
       const casilla = tablero.matriz[7][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3565,7 +3515,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,6] — interior, 8 vecinos: [6,5], [6,6], [6,7], [7,5], [7,7], [8,5], [8,6], [8,7]
+    // Casilla 7,6 interior, 8 vecinos: 6,5 ,6,6 ,6,7 ,7,5 ,7,7 ,8,5 ,8,6 ,8,7
     {
       const casilla = tablero.matriz[7][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3579,7 +3529,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,7] — interior, 8 vecinos: [6,6], [6,7], [6,8], [7,6], [7,8], [8,6], [8,7], [8,8]
+    // Casilla 7,7 interior, 8 vecinos: 6,6 ,6,7 ,6,8 ,7,6 ,7,8 ,8,6 ,8,7 ,8,8
     {
       const casilla = tablero.matriz[7][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3593,7 +3543,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,8] — interior, 8 vecinos: [6,7], [6,8], [6,9], [7,7], [7,9], [8,7], [8,8], [8,9]
+    // Casilla 7,8 interior, 8 vecinos: 6,7 ,6,8 ,6,9 ,7,7 ,7,9 ,8,7 ,8,8 ,8,9
     {
       const casilla = tablero.matriz[7][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3607,7 +3557,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,9] — borde, 5 vecinos: [6,8], [6,9], [7,8], [8,8], [8,9]
+    // Casilla 7,9 borde, 5 vecinos: 6,8 ,6,9 ,7,8 ,8,8 ,8,9
     {
       const casilla = tablero.matriz[7][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3621,7 +3571,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,0] — borde, 5 vecinos: [7,0], [7,1], [8,1], [9,0], [9,1]
+    // Casilla 8,0 borde, 5 vecinos: 7,0 ,7,1 ,8,1 ,9,0 ,9,1
     {
       const casilla = tablero.matriz[8][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3635,7 +3585,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,1] — interior, 8 vecinos: [7,0], [7,1], [7,2], [8,0], [8,2], [9,0], [9,1], [9,2]
+    // Casilla 8,1 interior, 8 vecinos: 7,0 ,7,1 ,7,2 ,8,0 ,8,2 ,9,0 ,9,1 ,9,2
     {
       const casilla = tablero.matriz[8][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3649,7 +3599,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,2] — interior, 8 vecinos: [7,1], [7,2], [7,3], [8,1], [8,3], [9,1], [9,2], [9,3]
+    // Casilla 8,2 interior, 8 vecinos: 7,1 ,7,2 ,7,3 ,8,1 ,8,3 ,9,1 ,9,2 ,9,3
     {
       const casilla = tablero.matriz[8][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3663,7 +3613,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,3] — interior, 8 vecinos: [7,2], [7,3], [7,4], [8,2], [8,4], [9,2], [9,3], [9,4]
+    // Casilla 8,3 interior, 8 vecinos: 7,2 ,7,3 ,7,4 ,8,2 ,8,4 ,9,2 ,9,3 ,9,4
     {
       const casilla = tablero.matriz[8][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3677,7 +3627,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,4] — interior, 8 vecinos: [7,3], [7,4], [7,5], [8,3], [8,5], [9,3], [9,4], [9,5]
+    // Casilla 8,4 interior, 8 vecinos: 7,3 ,7,4 ,7,5 ,8,3 ,8,5 ,9,3 ,9,4 ,9,5
     {
       const casilla = tablero.matriz[8][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3691,7 +3641,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,5] — interior, 8 vecinos: [7,4], [7,5], [7,6], [8,4], [8,6], [9,4], [9,5], [9,6]
+    // Casilla 8,5 interior, 8 vecinos: 7,4 ,7,5 ,7,6 ,8,4 ,8,6 ,9,4 ,9,5 ,9,6
     {
       const casilla = tablero.matriz[8][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3705,7 +3655,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,6] — interior, 8 vecinos: [7,5], [7,6], [7,7], [8,5], [8,7], [9,5], [9,6], [9,7]
+    // Casilla 8,6 interior, 8 vecinos: 7,5 ,7,6 ,7,7 ,8,5 ,8,7 ,9,5 ,9,6 ,9,7
     {
       const casilla = tablero.matriz[8][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3719,7 +3669,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,7] — interior, 8 vecinos: [7,6], [7,7], [7,8], [8,6], [8,8], [9,6], [9,7], [9,8]
+    // Casilla 8,7 interior, 8 vecinos: 7,6 ,7,7 ,7,8 ,8,6 ,8,8 ,9,6 ,9,7 ,9,8
     {
       const casilla = tablero.matriz[8][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3733,7 +3683,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,8] — interior, 8 vecinos: [7,7], [7,8], [7,9], [8,7], [8,9], [9,7], [9,8], [9,9]
+    // Casilla 8,8 interior, 8 vecinos: 7,7 ,7,8 ,7,9 ,8,7 ,8,9 ,9,7 ,9,8 ,9,9
     {
       const casilla = tablero.matriz[8][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3747,7 +3697,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,9] — borde, 5 vecinos: [7,8], [7,9], [8,8], [9,8], [9,9]
+    // Casilla 8,9 borde, 5 vecinos: 7,8 ,7,9 ,8,8 ,9,8 ,9,9
     {
       const casilla = tablero.matriz[8][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3761,7 +3711,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,0] — esquina, 3 vecinos: [8,0], [8,1], [9,1]
+    // Casilla 9,0 esquina, 3 vecinos: 8,0 ,8,1 ,9,1
     {
       const casilla = tablero.matriz[9][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3775,7 +3725,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,1] — borde, 5 vecinos: [8,0], [8,1], [8,2], [9,0], [9,2]
+    // Casilla 9,1 borde, 5 vecinos: 8,0 ,8,1 ,8,2 ,9,0 ,9,2
     {
       const casilla = tablero.matriz[9][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3789,7 +3739,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,2] — borde, 5 vecinos: [8,1], [8,2], [8,3], [9,1], [9,3]
+    // Casilla 9,2 borde, 5 vecinos: 8,1 ,8,2 ,8,3 ,9,1 ,9,3
     {
       const casilla = tablero.matriz[9][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3803,7 +3753,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,3] — borde, 5 vecinos: [8,2], [8,3], [8,4], [9,2], [9,4]
+    // Casilla 9,3 borde, 5 vecinos: 8,2 ,8,3 ,8,4 ,9,2 ,9,4
     {
       const casilla = tablero.matriz[9][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3817,7 +3767,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,4] — borde, 5 vecinos: [8,3], [8,4], [8,5], [9,3], [9,5]
+    // Casilla 9,4 borde, 5 vecinos: 8,3 ,8,4 ,8,5 ,9,3 ,9,5
     {
       const casilla = tablero.matriz[9][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3831,7 +3781,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,5] — borde, 5 vecinos: [8,4], [8,5], [8,6], [9,4], [9,6]
+    // Casilla 9,5 borde, 5 vecinos: 8,4 ,8,5 ,8,6 ,9,4 ,9,6
     {
       const casilla = tablero.matriz[9][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3845,7 +3795,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,6] — borde, 5 vecinos: [8,5], [8,6], [8,7], [9,5], [9,7]
+    // Casilla 9,6 borde, 5 vecinos: 8,5 ,8,6 ,8,7 ,9,5 ,9,7
     {
       const casilla = tablero.matriz[9][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3859,7 +3809,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,7] — borde, 5 vecinos: [8,6], [8,7], [8,8], [9,6], [9,8]
+    // Casilla 9,7 borde, 5 vecinos: 8,6 ,8,7 ,8,8 ,9,6 ,9,8
     {
       const casilla = tablero.matriz[9][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3873,7 +3823,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,8] — borde, 5 vecinos: [8,7], [8,8], [8,9], [9,7], [9,9]
+    // Casilla 9,8 borde, 5 vecinos: 8,7 ,8,8 ,8,9 ,9,7 ,9,9
     {
       const casilla = tablero.matriz[9][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3887,7 +3837,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,9] — esquina, 3 vecinos: [8,8], [8,9], [9,8]
+    // Casilla 9,9 esquina, 3 vecinos: 8,8 ,8,9 ,9,8
     {
       const casilla = tablero.matriz[9][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3904,19 +3854,13 @@ export class IABuscaminasServicio {
     return grupos;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // CAPA 3 — ESTADÍSTICA (explícita por cada casilla del tablero 10x10)
-  // ─────────────────────────────────────────────────────────────────────────
 
-  /**
-   * Calcula el riesgo de cada casilla cerrada según sus vecinos abiertos.
-   * riesgo = (minasFaltantes / vecinosCerrados) × 100
-   * Cada vecino hereda el riesgo más alto que le asigne cualquiera de sus pistas.
-   * Escrito explícitamente para cada una de las 100 posiciones del tablero 10x10.
-   */
+  // CAPA 3 
+
+  // Calcula el riesgo de cada casilla cerrada basado en las casillas abiertas y sus numeros
   private calcularRiesgosPorCasillasAbiertas(tablero: Tablero): void {
 
-    // ── Casilla [0,0] — esquina, 3 vecinos: [0,1], [1,0], [1,1]
+    // Casilla 0,0 esquina, 3 vecinos: 0,1 ,1,0 ,1,1
     {
       const casilla = tablero.matriz[0][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3931,7 +3875,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,1] — borde, 5 vecinos: [0,0], [0,2], [1,0], [1,1], [1,2]
+    // Casilla 0,1 borde, 5 vecinos: 0,0 ,0,2 ,1,0 ,1,1 ,1,2
     {
       const casilla = tablero.matriz[0][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3946,7 +3890,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,2] — borde, 5 vecinos: [0,1], [0,3], [1,1], [1,2], [1,3]
+    // Casilla 0,2 borde, 5 vecinos: 0,1 ,0,3 ,1,1 ,1,2 ,1,3
     {
       const casilla = tablero.matriz[0][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3961,7 +3905,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,3] — borde, 5 vecinos: [0,2], [0,4], [1,2], [1,3], [1,4]
+    // Casilla 0,3 borde, 5 vecinos: 0,2 ,0,4 ,1,2 ,1,3 ,1,4
     {
       const casilla = tablero.matriz[0][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3976,7 +3920,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,4] — borde, 5 vecinos: [0,3], [0,5], [1,3], [1,4], [1,5]
+    // Casilla 0,4 borde, 5 vecinos: 0,3 ,0,5 ,1,3 ,1,4 ,1,5
     {
       const casilla = tablero.matriz[0][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -3991,7 +3935,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,5] — borde, 5 vecinos: [0,4], [0,6], [1,4], [1,5], [1,6]
+    // Casilla 0,5 borde, 5 vecinos: 0,4 ,0,6 ,1,4 ,1,5 ,1,6
     {
       const casilla = tablero.matriz[0][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4006,7 +3950,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,6] — borde, 5 vecinos: [0,5], [0,7], [1,5], [1,6], [1,7]
+    // Casilla 0,6 borde, 5 vecinos: 0,5 ,0,7 ,1,5 ,1,6 ,1,7
     {
       const casilla = tablero.matriz[0][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4021,7 +3965,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,7] — borde, 5 vecinos: [0,6], [0,8], [1,6], [1,7], [1,8]
+    // Casilla 0,7 borde, 5 vecinos: 0,6 ,0,8 ,1,6 ,1,7 ,1,8
     {
       const casilla = tablero.matriz[0][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4036,7 +3980,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,8] — borde, 5 vecinos: [0,7], [0,9], [1,7], [1,8], [1,9]
+    // Casilla 0,8 borde, 5 vecinos: 0,7 ,0,9 ,1,7 ,1,8 ,1,9
     {
       const casilla = tablero.matriz[0][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4051,7 +3995,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [0,9] — esquina, 3 vecinos: [0,8], [1,8], [1,9]
+    // Casilla 0,9 esquina, 3 vecinos: 0,8 ,1,8 ,1,9
     {
       const casilla = tablero.matriz[0][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4066,7 +4010,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,0] — borde, 5 vecinos: [0,0], [0,1], [1,1], [2,0], [2,1]
+    // Casilla 1,0 borde, 5 vecinos: 0,0 ,0,1 ,1,1 ,2,0 ,2,1
     {
       const casilla = tablero.matriz[1][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4081,7 +4025,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,1] — interior, 8 vecinos: [0,0], [0,1], [0,2], [1,0], [1,2], [2,0], [2,1], [2,2]
+    // Casilla 1,1 interior, 8 vecinos: 0,0 ,0,1 ,0,2 ,1,0 ,1,2 ,2,0 ,2,1 ,2,2
     {
       const casilla = tablero.matriz[1][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4096,7 +4040,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,2] — interior, 8 vecinos: [0,1], [0,2], [0,3], [1,1], [1,3], [2,1], [2,2], [2,3]
+    // Casilla 1,2 interior, 8 vecinos: 0,1 ,0,2 ,0,3 ,1,1 ,1,3 ,2,1 ,2,2 ,2,3
     {
       const casilla = tablero.matriz[1][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4111,7 +4055,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,3] — interior, 8 vecinos: [0,2], [0,3], [0,4], [1,2], [1,4], [2,2], [2,3], [2,4]
+    // Casilla 1,3 interior, 8 vecinos: 0,2 ,0,3 ,0,4 ,1,2 ,1,4 ,2,2 ,2,3 ,2,4
     {
       const casilla = tablero.matriz[1][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4126,7 +4070,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,4] — interior, 8 vecinos: [0,3], [0,4], [0,5], [1,3], [1,5], [2,3], [2,4], [2,5]
+    // Casilla 1,4 interior, 8 vecinos: 0,3 ,0,4 ,0,5 ,1,3 ,1,5 ,2,3 ,2,4 ,2,5
     {
       const casilla = tablero.matriz[1][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4141,7 +4085,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,5] — interior, 8 vecinos: [0,4], [0,5], [0,6], [1,4], [1,6], [2,4], [2,5], [2,6]
+    // Casilla 1,5 interior, 8 vecinos: 0,4 ,0,5 ,0,6 ,1,4 ,1,6 ,2,4 ,2,5 ,2,6
     {
       const casilla = tablero.matriz[1][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4156,7 +4100,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,6] — interior, 8 vecinos: [0,5], [0,6], [0,7], [1,5], [1,7], [2,5], [2,6], [2,7]
+    // Casilla 1,6 interior, 8 vecinos: 0,5 ,0,6 ,0,7 ,1,5 ,1,7 ,2,5 ,2,6 ,2,7
     {
       const casilla = tablero.matriz[1][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4171,7 +4115,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,7] — interior, 8 vecinos: [0,6], [0,7], [0,8], [1,6], [1,8], [2,6], [2,7], [2,8]
+    // Casilla 1,7 interior, 8 vecinos: 0,6 ,0,7 ,0,8 ,1,6 ,1,8 ,2,6 ,2,7 ,2,8
     {
       const casilla = tablero.matriz[1][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4186,7 +4130,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,8] — interior, 8 vecinos: [0,7], [0,8], [0,9], [1,7], [1,9], [2,7], [2,8], [2,9]
+    // Casilla 1,8 interior, 8 vecinos: 0,7 ,0,8 ,0,9 ,1,7 ,1,9 ,2,7 ,2,8 ,2,9
     {
       const casilla = tablero.matriz[1][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4201,7 +4145,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [1,9] — borde, 5 vecinos: [0,8], [0,9], [1,8], [2,8], [2,9]
+    // Casilla 1,9 borde, 5 vecinos: 0,8 ,0,9 ,1,8 ,2,8 ,2,9
     {
       const casilla = tablero.matriz[1][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4216,7 +4160,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,0] — borde, 5 vecinos: [1,0], [1,1], [2,1], [3,0], [3,1]
+    // Casilla 2,0 borde, 5 vecinos: 1,0 ,1,1 ,2,1 ,3,0 ,3,1
     {
       const casilla = tablero.matriz[2][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4231,7 +4175,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,1] — interior, 8 vecinos: [1,0], [1,1], [1,2], [2,0], [2,2], [3,0], [3,1], [3,2]
+    // Casilla 2,1 interior, 8 vecinos: 1,0 ,1,1 ,1,2 ,2,0 ,2,2 ,3,0 ,3,1 ,3,2
     {
       const casilla = tablero.matriz[2][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4246,7 +4190,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,2] — interior, 8 vecinos: [1,1], [1,2], [1,3], [2,1], [2,3], [3,1], [3,2], [3,3]
+    // Casilla 2,2 interior, 8 vecinos: 1,1 ,1,2 ,1,3 ,2,1 ,2,3 ,3,1 ,3,2 ,3,3
     {
       const casilla = tablero.matriz[2][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4261,7 +4205,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,3] — interior, 8 vecinos: [1,2], [1,3], [1,4], [2,2], [2,4], [3,2], [3,3], [3,4]
+    // Casilla 2,3 interior, 8 vecinos: 1,2 ,1,3 ,1,4 ,2,2 ,2,4 ,3,2 ,3,3 ,3,4
     {
       const casilla = tablero.matriz[2][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4276,7 +4220,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,4] — interior, 8 vecinos: [1,3], [1,4], [1,5], [2,3], [2,5], [3,3], [3,4], [3,5]
+    // Casilla 2,4 interior, 8 vecinos: 1,3 ,1,4 ,1,5 ,2,3 ,2,5 ,3,3 ,3,4 ,3,5
     {
       const casilla = tablero.matriz[2][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4291,7 +4235,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,5] — interior, 8 vecinos: [1,4], [1,5], [1,6], [2,4], [2,6], [3,4], [3,5], [3,6]
+    // Casilla 2,5 interior, 8 vecinos: 1,4 ,1,5 ,1,6 ,2,4 ,2,6 ,3,4 ,3,5 ,3,6
     {
       const casilla = tablero.matriz[2][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4306,7 +4250,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,6] — interior, 8 vecinos: [1,5], [1,6], [1,7], [2,5], [2,7], [3,5], [3,6], [3,7]
+    // Casilla 2,6 interior, 8 vecinos: 1,5 ,1,6 ,1,7 ,2,5 ,2,7 ,3,5 ,3,6 ,3,7
     {
       const casilla = tablero.matriz[2][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4321,7 +4265,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,7] — interior, 8 vecinos: [1,6], [1,7], [1,8], [2,6], [2,8], [3,6], [3,7], [3,8]
+    // Casilla 2,7 interior, 8 vecinos: 1,6 ,1,7 ,1,8 ,2,6 ,2,8 ,3,6 ,3,7 ,3,8
     {
       const casilla = tablero.matriz[2][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4336,7 +4280,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,8] — interior, 8 vecinos: [1,7], [1,8], [1,9], [2,7], [2,9], [3,7], [3,8], [3,9]
+    // Casilla 2,8 interior, 8 vecinos: 1,7 ,1,8 ,1,9 ,2,7 ,2,9 ,3,7 ,3,8 ,3,9
     {
       const casilla = tablero.matriz[2][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4351,7 +4295,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [2,9] — borde, 5 vecinos: [1,8], [1,9], [2,8], [3,8], [3,9]
+    // Casilla 2,9 borde, 5 vecinos: 1,8 ,1,9 ,2,8 ,3,8 ,3,9
     {
       const casilla = tablero.matriz[2][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4366,7 +4310,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,0] — borde, 5 vecinos: [2,0], [2,1], [3,1], [4,0], [4,1]
+    // Casilla 3,0 borde, 5 vecinos: 2,0 ,2,1 ,3,1 ,4,0 ,4,1
     {
       const casilla = tablero.matriz[3][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4381,7 +4325,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,1] — interior, 8 vecinos: [2,0], [2,1], [2,2], [3,0], [3,2], [4,0], [4,1], [4,2]
+    // Casilla 3,1 interior, 8 vecinos: 2,0 ,2,1 ,2,2 ,3,0 ,3,2 ,4,0 ,4,1 ,4,2
     {
       const casilla = tablero.matriz[3][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4396,7 +4340,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,2] — interior, 8 vecinos: [2,1], [2,2], [2,3], [3,1], [3,3], [4,1], [4,2], [4,3]
+    // Casilla 3,2 interior, 8 vecinos: 2,1 ,2,2 ,2,3 ,3,1 ,3,3 ,4,1 ,4,2 ,4,3
     {
       const casilla = tablero.matriz[3][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4411,7 +4355,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,3] — interior, 8 vecinos: [2,2], [2,3], [2,4], [3,2], [3,4], [4,2], [4,3], [4,4]
+    // Casilla 3,3 interior, 8 vecinos: 2,2 ,2,3 ,2,4 ,3,2 ,3,4 ,4,2 ,4,3 ,4,4
     {
       const casilla = tablero.matriz[3][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4426,7 +4370,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,4] — interior, 8 vecinos: [2,3], [2,4], [2,5], [3,3], [3,5], [4,3], [4,4], [4,5]
+    // Casilla 3,4 interior, 8 vecinos: 2,3 ,2,4 ,2,5 ,3,3 ,3,5 ,4,3 ,4,4 ,4,5
     {
       const casilla = tablero.matriz[3][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4441,7 +4385,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,5] — interior, 8 vecinos: [2,4], [2,5], [2,6], [3,4], [3,6], [4,4], [4,5], [4,6]
+    // Casilla 3,5 interior, 8 vecinos: 2,4 ,2,5 ,2,6 ,3,4 ,3,6 ,4,4 ,4,5 ,4,6
     {
       const casilla = tablero.matriz[3][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4456,7 +4400,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,6] — interior, 8 vecinos: [2,5], [2,6], [2,7], [3,5], [3,7], [4,5], [4,6], [4,7]
+    // Casilla 3,6 interior, 8 vecinos: 2,5 ,2,6 ,2,7 ,3,5 ,3,7 ,4,5 ,4,6 ,4,7
     {
       const casilla = tablero.matriz[3][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4471,7 +4415,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,7] — interior, 8 vecinos: [2,6], [2,7], [2,8], [3,6], [3,8], [4,6], [4,7], [4,8]
+    // Casilla 3,7 interior, 8 vecinos: 2,6 ,2,7 ,2,8 ,3,6 ,3,8 ,4,6 ,4,7 ,4,8
     {
       const casilla = tablero.matriz[3][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4486,7 +4430,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,8] — interior, 8 vecinos: [2,7], [2,8], [2,9], [3,7], [3,9], [4,7], [4,8], [4,9]
+    // Casilla 3,8 interior, 8 vecinos: 2,7 ,2,8 ,2,9 ,3,7 ,3,9 ,4,7 ,4,8 ,4,9
     {
       const casilla = tablero.matriz[3][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4501,7 +4445,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [3,9] — borde, 5 vecinos: [2,8], [2,9], [3,8], [4,8], [4,9]
+    // Casilla 3,9 borde, 5 vecinos: 2,8 ,2,9 ,3,8 ,4,8 ,4,9
     {
       const casilla = tablero.matriz[3][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4516,7 +4460,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,0] — borde, 5 vecinos: [3,0], [3,1], [4,1], [5,0], [5,1]
+    // Casilla 4,0 borde, 5 vecinos: 3,0 ,3,1 ,4,1 ,5,0 ,5,1
     {
       const casilla = tablero.matriz[4][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4531,7 +4475,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,1] — interior, 8 vecinos: [3,0], [3,1], [3,2], [4,0], [4,2], [5,0], [5,1], [5,2]
+    // Casilla 4,1 interior, 8 vecinos: 3,0 ,3,1 ,3,2 ,4,0 ,4,2 ,5,0 ,5,1 ,5,2
     {
       const casilla = tablero.matriz[4][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4546,7 +4490,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,2] — interior, 8 vecinos: [3,1], [3,2], [3,3], [4,1], [4,3], [5,1], [5,2], [5,3]
+    // Casilla 4,2 interior, 8 vecinos: 3,1 ,3,2 ,3,3 ,4,1 ,4,3 ,5,1 ,5,2 ,5,3
     {
       const casilla = tablero.matriz[4][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4561,7 +4505,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,3] — interior, 8 vecinos: [3,2], [3,3], [3,4], [4,2], [4,4], [5,2], [5,3], [5,4]
+    // Casilla 4,3 interior, 8 vecinos: 3,2 ,3,3 ,3,4 ,4,2 ,4,4 ,5,2 ,5,3 ,5,4
     {
       const casilla = tablero.matriz[4][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4576,7 +4520,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,4] — interior, 8 vecinos: [3,3], [3,4], [3,5], [4,3], [4,5], [5,3], [5,4], [5,5]
+    // Casilla 4,4 interior, 8 vecinos: 3,3 ,3,4 ,3,5 ,4,3 ,4,5 ,5,3 ,5,4 ,5,5
     {
       const casilla = tablero.matriz[4][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4591,7 +4535,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,5] — interior, 8 vecinos: [3,4], [3,5], [3,6], [4,4], [4,6], [5,4], [5,5], [5,6]
+    // Casilla 4,5 interior, 8 vecinos: 3,4 ,3,5 ,3,6 ,4,4 ,4,6 ,5,4 ,5,5 ,5,6
     {
       const casilla = tablero.matriz[4][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4606,7 +4550,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,6] — interior, 8 vecinos: [3,5], [3,6], [3,7], [4,5], [4,7], [5,5], [5,6], [5,7]
+    // Casilla 4,6 interior, 8 vecinos: 3,5 ,3,6 ,3,7 ,4,5 ,4,7 ,5,5 ,5,6 ,5,7
     {
       const casilla = tablero.matriz[4][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4621,7 +4565,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,7] — interior, 8 vecinos: [3,6], [3,7], [3,8], [4,6], [4,8], [5,6], [5,7], [5,8]
+    // Casilla 4,7 interior, 8 vecinos: 3,6 ,3,7 ,3,8 ,4,6 ,4,8 ,5,6 ,5,7 ,5,8
     {
       const casilla = tablero.matriz[4][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4636,7 +4580,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,8] — interior, 8 vecinos: [3,7], [3,8], [3,9], [4,7], [4,9], [5,7], [5,8], [5,9]
+    // Casilla 4,8 interior, 8 vecinos: 3,7 ,3,8 ,3,9 ,4,7 ,4,9 ,5,7 ,5,8 ,5,9
     {
       const casilla = tablero.matriz[4][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4651,7 +4595,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [4,9] — borde, 5 vecinos: [3,8], [3,9], [4,8], [5,8], [5,9]
+    // Casilla 4,9 borde, 5 vecinos: 3,8 ,3,9 ,4,8 ,5,8 ,5,9
     {
       const casilla = tablero.matriz[4][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4666,7 +4610,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,0] — borde, 5 vecinos: [4,0], [4,1], [5,1], [6,0], [6,1]
+    // Casilla 5,0 borde, 5 vecinos: 4,0 ,4,1 ,5,1 ,6,0 ,6,1
     {
       const casilla = tablero.matriz[5][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4681,7 +4625,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,1] — interior, 8 vecinos: [4,0], [4,1], [4,2], [5,0], [5,2], [6,0], [6,1], [6,2]
+    // Casilla 5,1 interior, 8 vecinos: 4,0 ,4,1 ,4,2 ,5,0 ,5,2 ,6,0 ,6,1 ,6,2
     {
       const casilla = tablero.matriz[5][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4696,7 +4640,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,2] — interior, 8 vecinos: [4,1], [4,2], [4,3], [5,1], [5,3], [6,1], [6,2], [6,3]
+    // Casilla 5,2 interior, 8 vecinos: 4,1 ,4,2 ,4,3 ,5,1 ,5,3 ,6,1 ,6,2 ,6,3
     {
       const casilla = tablero.matriz[5][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4711,7 +4655,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,3] — interior, 8 vecinos: [4,2], [4,3], [4,4], [5,2], [5,4], [6,2], [6,3], [6,4]
+    // Casilla 5,3 interior, 8 vecinos: 4,2 ,4,3 ,4,4 ,5,2 ,5,4 ,6,2 ,6,3 ,6,4
     {
       const casilla = tablero.matriz[5][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4726,7 +4670,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,4] — interior, 8 vecinos: [4,3], [4,4], [4,5], [5,3], [5,5], [6,3], [6,4], [6,5]
+    // Casilla 5,4 interior, 8 vecinos: 4,3 ,4,4 ,4,5 ,5,3 ,5,5 ,6,3 ,6,4 ,6,5
     {
       const casilla = tablero.matriz[5][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4741,7 +4685,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,5] — interior, 8 vecinos: [4,4], [4,5], [4,6], [5,4], [5,6], [6,4], [6,5], [6,6]
+    // Casilla 5,5 interior, 8 vecinos: 4,4 ,4,5 ,4,6 ,5,4 ,5,6 ,6,4 ,6,5 ,6,6
     {
       const casilla = tablero.matriz[5][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4756,7 +4700,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,6] — interior, 8 vecinos: [4,5], [4,6], [4,7], [5,5], [5,7], [6,5], [6,6], [6,7]
+    // Casilla 5,6 interior, 8 vecinos: 4,5 ,4,6 ,4,7 ,5,5 ,5,7 ,6,5 ,6,6 ,6,7
     {
       const casilla = tablero.matriz[5][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4771,7 +4715,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,7] — interior, 8 vecinos: [4,6], [4,7], [4,8], [5,6], [5,8], [6,6], [6,7], [6,8]
+    // Casilla 5,7 interior, 8 vecinos: 4,6 ,4,7 ,4,8 ,5,6 ,5,8 ,6,6 ,6,7 ,6,8
     {
       const casilla = tablero.matriz[5][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4786,7 +4730,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,8] — interior, 8 vecinos: [4,7], [4,8], [4,9], [5,7], [5,9], [6,7], [6,8], [6,9]
+    // Casilla 5,8 interior, 8 vecinos: 4,7 ,4,8 ,4,9 ,5,7 ,5,9 ,6,7 ,6,8 ,6,9
     {
       const casilla = tablero.matriz[5][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4801,7 +4745,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [5,9] — borde, 5 vecinos: [4,8], [4,9], [5,8], [6,8], [6,9]
+    // Casilla 5,9 borde, 5 vecinos: 4,8 ,4,9 ,5,8 ,6,8 ,6,9
     {
       const casilla = tablero.matriz[5][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4816,7 +4760,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,0] — borde, 5 vecinos: [5,0], [5,1], [6,1], [7,0], [7,1]
+    // Casilla 6,0 borde, 5 vecinos: 5,0 ,5,1 ,6,1 ,7,0 ,7,1
     {
       const casilla = tablero.matriz[6][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4831,7 +4775,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,1] — interior, 8 vecinos: [5,0], [5,1], [5,2], [6,0], [6,2], [7,0], [7,1], [7,2]
+    // Casilla 6,1 interior, 8 vecinos: 5,0 ,5,1 ,5,2 ,6,0 ,6,2 ,7,0 ,7,1 ,7,2
     {
       const casilla = tablero.matriz[6][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4846,7 +4790,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,2] — interior, 8 vecinos: [5,1], [5,2], [5,3], [6,1], [6,3], [7,1], [7,2], [7,3]
+    // Casilla 6,2 interior, 8 vecinos: 5,1 ,5,2 ,5,3 ,6,1 ,6,3 ,7,1 ,7,2 ,7,3
     {
       const casilla = tablero.matriz[6][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4861,7 +4805,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,3] — interior, 8 vecinos: [5,2], [5,3], [5,4], [6,2], [6,4], [7,2], [7,3], [7,4]
+    // Casilla 6,3 interior, 8 vecinos: 5,2 ,5,3 ,5,4 ,6,2 ,6,4 ,7,2 ,7,3 ,7,4
     {
       const casilla = tablero.matriz[6][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4876,7 +4820,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,4] — interior, 8 vecinos: [5,3], [5,4], [5,5], [6,3], [6,5], [7,3], [7,4], [7,5]
+    // Casilla 6,4 interior, 8 vecinos: 5,3 ,5,4 ,5,5 ,6,3 ,6,5 ,7,3 ,7,4 ,7,5
     {
       const casilla = tablero.matriz[6][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4891,7 +4835,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,5] — interior, 8 vecinos: [5,4], [5,5], [5,6], [6,4], [6,6], [7,4], [7,5], [7,6]
+    // Casilla 6,5 interior, 8 vecinos: 5,4 ,5,5 ,5,6 ,6,4 ,6,6 ,7,4 ,7,5 ,7,6
     {
       const casilla = tablero.matriz[6][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4906,7 +4850,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,6] — interior, 8 vecinos: [5,5], [5,6], [5,7], [6,5], [6,7], [7,5], [7,6], [7,7]
+    // Casilla 6,6 interior, 8 vecinos: 5,5 ,5,6 ,5,7 ,6,5 ,6,7 ,7,5 ,7,6 ,7,7
     {
       const casilla = tablero.matriz[6][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4921,7 +4865,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,7] — interior, 8 vecinos: [5,6], [5,7], [5,8], [6,6], [6,8], [7,6], [7,7], [7,8]
+    // Casilla 6,7 interior, 8 vecinos: 5,6 ,5,7 ,5,8 ,6,6 ,6,8 ,7,6 ,7,7 ,7,8
     {
       const casilla = tablero.matriz[6][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4936,7 +4880,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,8] — interior, 8 vecinos: [5,7], [5,8], [5,9], [6,7], [6,9], [7,7], [7,8], [7,9]
+    // Casilla 6,8 interior, 8 vecinos: 5,7 ,5,8 ,5,9 ,6,7 ,6,9 ,7,7 ,7,8 ,7,9
     {
       const casilla = tablero.matriz[6][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4951,7 +4895,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [6,9] — borde, 5 vecinos: [5,8], [5,9], [6,8], [7,8], [7,9]
+    // Casilla 6,9 borde, 5 vecinos: 5,8 ,5,9 ,6,8 ,7,8 ,7,9
     {
       const casilla = tablero.matriz[6][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4966,7 +4910,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,0] — borde, 5 vecinos: [6,0], [6,1], [7,1], [8,0], [8,1]
+    // Casilla 7,0 borde, 5 vecinos: 6,0 ,6,1 ,7,1 ,8,0 ,8,1
     {
       const casilla = tablero.matriz[7][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4981,7 +4925,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,1] — interior, 8 vecinos: [6,0], [6,1], [6,2], [7,0], [7,2], [8,0], [8,1], [8,2]
+    // Casilla 7,1 interior, 8 vecinos: 6,0 ,6,1 ,6,2 ,7,0 ,7,2 ,8,0 ,8,1 ,8,2
     {
       const casilla = tablero.matriz[7][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -4996,7 +4940,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,2] — interior, 8 vecinos: [6,1], [6,2], [6,3], [7,1], [7,3], [8,1], [8,2], [8,3]
+    // Casilla 7,2 interior, 8 vecinos: 6,1 ,6,2 ,6,3 ,7,1 ,7,3 ,8,1 ,8,2 ,8,3
     {
       const casilla = tablero.matriz[7][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5011,7 +4955,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,3] — interior, 8 vecinos: [6,2], [6,3], [6,4], [7,2], [7,4], [8,2], [8,3], [8,4]
+    // Casilla 7,3 interior, 8 vecinos: 6,2 ,6,3 ,6,4 ,7,2 ,7,4 ,8,2 ,8,3 ,8,4
     {
       const casilla = tablero.matriz[7][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5026,7 +4970,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,4] — interior, 8 vecinos: [6,3], [6,4], [6,5], [7,3], [7,5], [8,3], [8,4], [8,5]
+    // Casilla 7,4 interior, 8 vecinos: 6,3 ,6,4 ,6,5 ,7,3 ,7,5 ,8,3 ,8,4 ,8,5
     {
       const casilla = tablero.matriz[7][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5041,7 +4985,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,5] — interior, 8 vecinos: [6,4], [6,5], [6,6], [7,4], [7,6], [8,4], [8,5], [8,6]
+    // Casilla 7,5 interior, 8 vecinos: 6,4 ,6,5 ,6,6 ,7,4 ,7,6 ,8,4 ,8,5 ,8,6
     {
       const casilla = tablero.matriz[7][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5056,7 +5000,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,6] — interior, 8 vecinos: [6,5], [6,6], [6,7], [7,5], [7,7], [8,5], [8,6], [8,7]
+    // Casilla 7,6 interior, 8 vecinos: 6,5 ,6,6 ,6,7 ,7,5 ,7,7 ,8,5 ,8,6 ,8,7
     {
       const casilla = tablero.matriz[7][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5071,7 +5015,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,7] — interior, 8 vecinos: [6,6], [6,7], [6,8], [7,6], [7,8], [8,6], [8,7], [8,8]
+    // Casilla 7,7 interior, 8 vecinos: 6,6 ,6,7 ,6,8 ,7,6 ,7,8 ,8,6 ,8,7 ,8,8
     {
       const casilla = tablero.matriz[7][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5086,7 +5030,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,8] — interior, 8 vecinos: [6,7], [6,8], [6,9], [7,7], [7,9], [8,7], [8,8], [8,9]
+    // Casilla 7,8 interior, 8 vecinos: 6,7 ,6,8 ,6,9 ,7,7 ,7,9 ,8,7 ,8,8 ,8,9
     {
       const casilla = tablero.matriz[7][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5101,7 +5045,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [7,9] — borde, 5 vecinos: [6,8], [6,9], [7,8], [8,8], [8,9]
+    // Casilla 7,9 borde, 5 vecinos: 6,8 ,6,9 ,7,8 ,8,8 ,8,9
     {
       const casilla = tablero.matriz[7][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5116,7 +5060,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,0] — borde, 5 vecinos: [7,0], [7,1], [8,1], [9,0], [9,1]
+    // Casilla 8,0 borde, 5 vecinos: 7,0 ,7,1 ,8,1 ,9,0 ,9,1
     {
       const casilla = tablero.matriz[8][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5131,7 +5075,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,1] — interior, 8 vecinos: [7,0], [7,1], [7,2], [8,0], [8,2], [9,0], [9,1], [9,2]
+    // Casilla 8,1 interior, 8 vecinos: 7,0 ,7,1 ,7,2 ,8,0 ,8,2 ,9,0 ,9,1 ,9,2
     {
       const casilla = tablero.matriz[8][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5146,7 +5090,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,2] — interior, 8 vecinos: [7,1], [7,2], [7,3], [8,1], [8,3], [9,1], [9,2], [9,3]
+    // Casilla 8,2 interior, 8 vecinos: 7,1 ,7,2 ,7,3 ,8,1 ,8,3 ,9,1 ,9,2 ,9,3
     {
       const casilla = tablero.matriz[8][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5161,7 +5105,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,3] — interior, 8 vecinos: [7,2], [7,3], [7,4], [8,2], [8,4], [9,2], [9,3], [9,4]
+    // Casilla 8,3 interior, 8 vecinos: 7,2 ,7,3 ,7,4 ,8,2 ,8,4 ,9,2 ,9,3 ,9,4
     {
       const casilla = tablero.matriz[8][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5176,7 +5120,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,4] — interior, 8 vecinos: [7,3], [7,4], [7,5], [8,3], [8,5], [9,3], [9,4], [9,5]
+    // Casilla 8,4 interior, 8 vecinos: 7,3 ,7,4 ,7,5 ,8,3 ,8,5 ,9,3 ,9,4 ,9,5
     {
       const casilla = tablero.matriz[8][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5191,7 +5135,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,5] — interior, 8 vecinos: [7,4], [7,5], [7,6], [8,4], [8,6], [9,4], [9,5], [9,6]
+    // Casilla 8,5 interior, 8 vecinos: 7,4 ,7,5 ,7,6 ,8,4 ,8,6 ,9,4 ,9,5 ,9,6
     {
       const casilla = tablero.matriz[8][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5206,7 +5150,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,6] — interior, 8 vecinos: [7,5], [7,6], [7,7], [8,5], [8,7], [9,5], [9,6], [9,7]
+    // Casilla 8,6 interior, 8 vecinos: 7,5 ,7,6 ,7,7 ,8,5 ,8,7 ,9,5 ,9,6 ,9,7
     {
       const casilla = tablero.matriz[8][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5221,7 +5165,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,7] — interior, 8 vecinos: [7,6], [7,7], [7,8], [8,6], [8,8], [9,6], [9,7], [9,8]
+    // Casilla 8,7 interior, 8 vecinos: 7,6 ,7,7 ,7,8 ,8,6 ,8,8 ,9,6 ,9,7 ,9,8
     {
       const casilla = tablero.matriz[8][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5236,7 +5180,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,8] — interior, 8 vecinos: [7,7], [7,8], [7,9], [8,7], [8,9], [9,7], [9,8], [9,9]
+    // Casilla 8,8 interior, 8 vecinos: 7,7 ,7,8 ,7,9 ,8,7 ,8,9 ,9,7 ,9,8 ,9,9
     {
       const casilla = tablero.matriz[8][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5251,7 +5195,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [8,9] — borde, 5 vecinos: [7,8], [7,9], [8,8], [9,8], [9,9]
+    // Casilla 8,9 borde, 5 vecinos: 7,8 ,7,9 ,8,8 ,9,8 ,9,9
     {
       const casilla = tablero.matriz[8][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5266,7 +5210,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,0] — esquina, 3 vecinos: [8,0], [8,1], [9,1]
+    // Casilla 9,0 esquina, 3 vecinos: 8,0 ,8,1 ,9,1
     {
       const casilla = tablero.matriz[9][0];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5281,7 +5225,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,1] — borde, 5 vecinos: [8,0], [8,1], [8,2], [9,0], [9,2]
+    // Casilla 9,1 borde, 5 vecinos: 8,0 ,8,1 ,8,2 ,9,0 ,9,2
     {
       const casilla = tablero.matriz[9][1];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5296,7 +5240,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,2] — borde, 5 vecinos: [8,1], [8,2], [8,3], [9,1], [9,3]
+    // Casilla 9,2 borde, 5 vecinos: 8,1 ,8,2 ,8,3 ,9,1 ,9,3
     {
       const casilla = tablero.matriz[9][2];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5311,7 +5255,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,3] — borde, 5 vecinos: [8,2], [8,3], [8,4], [9,2], [9,4]
+    // Casilla 9,3 borde, 5 vecinos: 8,2 ,8,3 ,8,4 ,9,2 ,9,4
     {
       const casilla = tablero.matriz[9][3];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5326,7 +5270,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,4] — borde, 5 vecinos: [8,3], [8,4], [8,5], [9,3], [9,5]
+    // Casilla 9,4 borde, 5 vecinos: 8,3 ,8,4 ,8,5 ,9,3 ,9,5
     {
       const casilla = tablero.matriz[9][4];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5341,7 +5285,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,5] — borde, 5 vecinos: [8,4], [8,5], [8,6], [9,4], [9,6]
+    // Casilla 9,5 borde, 5 vecinos: 8,4 ,8,5 ,8,6 ,9,4 ,9,6
     {
       const casilla = tablero.matriz[9][5];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5356,7 +5300,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,6] — borde, 5 vecinos: [8,5], [8,6], [8,7], [9,5], [9,7]
+    // Casilla 9,6 borde, 5 vecinos: 8,5 ,8,6 ,8,7 ,9,5 ,9,7
     {
       const casilla = tablero.matriz[9][6];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5371,7 +5315,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,7] — borde, 5 vecinos: [8,6], [8,7], [8,8], [9,6], [9,8]
+    // Casilla 9,7 borde, 5 vecinos: 8,6 ,8,7 ,8,8 ,9,6 ,9,8
     {
       const casilla = tablero.matriz[9][7];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5386,7 +5330,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,8] — borde, 5 vecinos: [8,7], [8,8], [8,9], [9,7], [9,9]
+    // Casilla 9,8 borde, 5 vecinos: 8,7 ,8,8 ,8,9 ,9,7 ,9,9
     {
       const casilla = tablero.matriz[9][8];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5401,7 +5345,7 @@ export class IABuscaminasServicio {
       }
     }
 
-    // ── Casilla [9,9] — esquina, 3 vecinos: [8,8], [8,9], [9,8]
+    // Casilla 9,9 esquina, 3 vecinos: 8,8 ,8,9 ,9,8
     {
       const casilla = tablero.matriz[9][9];
       if (casilla.abierta && casilla.minasAlrededor !== null) {
@@ -5417,11 +5361,7 @@ export class IABuscaminasServicio {
     }
   }
 
-  /**
-   * Elige la casilla de menor riesgo estadístico.
-   * Si varias tienen el mismo riesgo mínimo, elige una al azar para no empezar siempre igual.
-   * Si ninguna pista le asignó riesgo, se usa 50% como estimación base neutral.
-   */
+  // Busca la jugada con menor riesgo entre las casillas disponibles, considerando la probabilidad de mina calculada y evitando repetir la última jugada si es posible
   private buscarJugadaPorEstadistica(tablero: Tablero, casillasDisponibles: Casilla[]): Jugada {
     this.calcularRiesgosPorCasillasAbiertas(tablero);
 
@@ -5438,6 +5378,6 @@ export class IABuscaminasServicio {
     if (!pool.length) throw new Error('No fue posible determinar una jugada');
 
     const elegida = pool[Math.floor(Math.random() * pool.length)];
-    return { fila: elegida.fila, columna: elegida.columna, motivo: 'Jugada estadística — menor riesgo entre candidatas', probabilidadMina: elegida.probabilidadMina, recomendacion: elegida.recomendacion };
+    return { fila: elegida.fila, columna: elegida.columna, motivo: 'Jugada estadística, menor riesgo entre candidatos', probabilidadMina: elegida.probabilidadMina, recomendacion: elegida.recomendacion };
   }
 }
